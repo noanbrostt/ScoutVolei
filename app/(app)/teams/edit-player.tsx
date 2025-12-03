@@ -1,14 +1,17 @@
-import { View, ScrollView } from 'react-native';
+import { View, ScrollView, ActivityIndicator } from 'react-native';
 import { TextInput, Button, Appbar, useTheme, SegmentedButtons, Text } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { playerService } from '../../../src/services/playerService';
 
-export default function AddPlayer() {
+export default function EditPlayer() {
   const router = useRouter();
-  const { teamId } = useLocalSearchParams();
+  const { playerId } = useLocalSearchParams();
   const theme = useTheme();
   
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
   const [name, setName] = useState('');
   const [surname, setSurname] = useState('');
   const [number, setNumber] = useState('');
@@ -17,10 +20,8 @@ export default function AddPlayer() {
   const [cpf, setCpf] = useState('');
   const [birthday, setBirthday] = useState('');
   const [allergies, setAllergies] = useState('');
-  const [saving, setSaving] = useState(false);
 
   const formatCPF = (text: string) => {
-    // 000.000.000-00
     const v = text.replace(/\D/g, '').slice(0, 11);
     if (v.length <= 3) return v;
     if (v.length <= 6) return `${v.slice(0, 3)}.${v.slice(3)}`;
@@ -29,7 +30,6 @@ export default function AddPlayer() {
   };
 
   const formatRG = (text: string) => {
-    // 00.000.000-0 (Generic Mask)
     const v = text.replace(/\D/g, '').slice(0, 9);
     if (v.length <= 2) return v;
     if (v.length <= 5) return `${v.slice(0, 2)}.${v.slice(2)}`;
@@ -38,20 +38,38 @@ export default function AddPlayer() {
   };
 
   const formatBirthday = (text: string) => {
-    // DD/MM/YYYY
     const v = text.replace(/\D/g, '').slice(0, 8);
     if (v.length <= 2) return v;
     if (v.length <= 4) return `${v.slice(0, 2)}/${v.slice(2)}`;
     return `${v.slice(0, 2)}/${v.slice(2, 4)}/${v.slice(4)}`;
   };
 
+  useEffect(() => {
+    const loadPlayer = async () => {
+      if (typeof playerId === 'string') {
+        const player = await playerService.getById(playerId);
+        if (player) {
+          setName(player.name);
+          setSurname(player.surname || '');
+          setNumber(player.number.toString());
+          setPosition(player.position);
+          setRg(player.rg || '');
+          setCpf(player.cpf || '');
+          setBirthday(player.birthday || '');
+          setAllergies(player.allergies || '');
+        }
+      }
+      setLoading(false);
+    };
+    loadPlayer();
+  }, [playerId]);
+
   const handleSave = async () => {
-    if (!name.trim() || !number.trim() || typeof teamId !== 'string') return;
+    if (!name.trim() || !number.trim() || typeof playerId !== 'string') return;
     
     setSaving(true);
     try {
-      await playerService.create({
-        teamId,
+      await playerService.update(playerId, {
         name,
         surname,
         number: parseInt(number),
@@ -69,11 +87,19 @@ export default function AddPlayer() {
     }
   };
 
+  if (loading) {
+    return (
+      <View className="flex-1 justify-center items-center" style={{ backgroundColor: theme.colors.background }}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
       <Appbar.Header>
         <Appbar.BackAction onPress={() => router.back()} />
-        <Appbar.Content title="Novo Jogador" />
+        <Appbar.Content title="Editar Jogador" />
       </Appbar.Header>
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
@@ -162,7 +188,7 @@ export default function AddPlayer() {
           disabled={!name.trim() || !number.trim() || saving}
           style={{ marginTop: 16, marginBottom: 32 }}
         >
-          Salvar Jogador
+          Salvar Alterações
         </Button>
       </ScrollView>
     </View>

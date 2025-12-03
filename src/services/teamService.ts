@@ -1,5 +1,5 @@
 import { db } from '../database/db';
-import { teams } from '../database/schemas';
+import { teams, players } from '../database/schemas';
 import { eq, desc } from 'drizzle-orm';
 import * as Crypto from 'expo-crypto';
 
@@ -13,11 +13,11 @@ export const teamService = {
     return result[0];
   },
 
-  create: async (name: string, city?: string) => {
+  create: async (name: string, color: string = '#2196F3') => {
     const newTeam = {
       id: Crypto.randomUUID(),
       name,
-      city,
+      color,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       syncStatus: 'pending' as const,
@@ -26,7 +26,7 @@ export const teamService = {
     return newTeam;
   },
 
-  update: async (id: string, data: Partial<{ name: string; city: string }>) => {
+  update: async (id: string, data: Partial<{ name: string; color: string }>) => {
     await db.update(teams)
       .set({ 
         ...data, 
@@ -37,6 +37,9 @@ export const teamService = {
   },
 
   delete: async (id: string) => {
+    // Delete related players first
+    await db.delete(players).where(eq(players.teamId, id));
+    // Then delete the team
     await db.delete(teams).where(eq(teams.id, id));
   }
 };

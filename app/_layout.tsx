@@ -7,6 +7,7 @@ import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { db } from '../src/database/db';
 import migrations from '../drizzle/migrations';
 import { View, Text } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 
 export default function RootLayout() {
   const { mode } = useThemeStore();
@@ -34,6 +35,7 @@ export default function RootLayout() {
 
   return (
     <PaperProvider theme={theme}>
+      <StatusBar hidden />
       <Stack screenOptions={{ headerShown: false }} />
     </PaperProvider>
   );

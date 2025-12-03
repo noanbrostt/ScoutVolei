@@ -49,13 +49,30 @@ export default function TeamDetails() {
     ]);
   };
 
+  const handleDeleteTeam = () => {
+    Alert.alert('Excluir Time', 'Tem certeza? Isso apagará todos os jogadores e dados associados.', [
+      { text: 'Cancelar', style: 'cancel' },
+      { 
+        text: 'Excluir', 
+        style: 'destructive', 
+        onPress: async () => {
+          await teamService.delete(id as string);
+          router.back();
+        }
+      }
+    ]);
+  };
+
   if (!team && !loading) return <View><Text>Time não encontrado</Text></View>;
 
   return (
     <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
       <Appbar.Header>
         <Appbar.BackAction onPress={() => router.back()} />
-        <Appbar.Content title={team?.name || 'Detalhes'} subtitle={team?.city} />
+        <Appbar.Content title={team?.name || 'Detalhes'} />
+        <Appbar.Action icon="export" onPress={() => router.push({ pathname: '/(app)/teams/export', params: { teamId: id } })} />
+        <Appbar.Action icon="pencil" onPress={() => router.push({ pathname: '/(app)/teams/edit', params: { id } })} />
+        <Appbar.Action icon="delete" onPress={handleDeleteTeam} />
       </Appbar.Header>
 
       <View className="flex-1">
@@ -69,6 +86,7 @@ export default function TeamDetails() {
               description={`${item.position} | ${item.name}`}
               left={props => <List.Icon {...props} icon="account" />}
               right={props => <IconButton {...props} icon="delete" onPress={() => handleDeletePlayer(item.id)} />}
+              onPress={() => router.push({ pathname: '/(app)/teams/edit-player', params: { playerId: item.id } })}
             />
           )}
           ItemSeparatorComponent={Divider}

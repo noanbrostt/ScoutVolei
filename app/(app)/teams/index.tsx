@@ -53,8 +53,7 @@ export default function TeamsList() {
           renderItem={({ item }) => (
             <List.Item
               title={item.name}
-              description={item.city || 'Sem cidade definida'}
-              left={props => <List.Icon {...props} icon="tshirt-crew" />}
+              left={props => <List.Icon {...props} icon="tshirt-crew" color={item.color} />}
               right={props => <List.Icon {...props} icon="chevron-right" />}
               onPress={() => router.push(`/(app)/teams/${item.id}`)}
               style={{ backgroundColor: theme.colors.surface, marginBottom: 1 }}

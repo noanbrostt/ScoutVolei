@@ -3,7 +3,7 @@ import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
 export const teams = sqliteTable('teams', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
-  city: text('city'),
+  color: text('color').notNull().default('#2196F3'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   syncStatus: text('sync_status').$type<'pending' | 'synced'>().default('pending').notNull(),
@@ -20,6 +20,7 @@ export const players = sqliteTable('players', {
   rg: text('rg'),
   birthday: text('birthday'),
   height: real('height'),
+  allergies: text('allergies'),
   createdAt: text('created_at').notNull(),
   syncStatus: text('sync_status').$type<'pending' | 'synced'>().default('pending').notNull(),
 });

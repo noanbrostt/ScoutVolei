@@ -9,7 +9,17 @@ export const playerService = {
     return await db.select().from(players).where(eq(players.teamId, teamId)).orderBy(asc(players.number));
   },
 
-  create: async (data: { teamId: string, name: string, surname?: string, number: number, position: string }) => {
+  create: async (data: { 
+    teamId: string, 
+    name: string, 
+    surname?: string, 
+    number: number, 
+    position: string,
+    rg?: string,
+    cpf?: string,
+    birthday?: string,
+    allergies?: string
+  }) => {
     const newPlayer = {
       id: Crypto.randomUUID(),
       teamId: data.teamId,
@@ -17,12 +27,39 @@ export const playerService = {
       surname: data.surname || null,
       number: data.number,
       position: data.position,
+      rg: data.rg || null,
+      cpf: data.cpf || null,
+      birthday: data.birthday || null,
+      allergies: data.allergies || null,
       createdAt: new Date().toISOString(),
       syncStatus: 'pending' as const,
     };
     
     await db.insert(players).values(newPlayer);
     return newPlayer;
+  },
+  
+  getById: async (id: string) => {
+    const result = await db.select().from(players).where(eq(players.id, id));
+    return result[0];
+  },
+
+  update: async (id: string, data: Partial<{
+    name: string,
+    surname: string,
+    number: number,
+    position: string,
+    rg: string,
+    cpf: string,
+    birthday: string,
+    allergies: string
+  }>) => {
+    await db.update(players)
+      .set({
+        ...data,
+        syncStatus: 'pending'
+      })
+      .where(eq(players.id, id));
   },
   
   delete: async (id: string) => {

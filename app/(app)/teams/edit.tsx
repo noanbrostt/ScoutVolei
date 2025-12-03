@@ -1,7 +1,7 @@
-import { View, TouchableOpacity, ScrollView } from 'react-native';
+import { View, TouchableOpacity } from 'react-native';
 import { TextInput, Button, Appbar, useTheme, Text } from 'react-native-paper';
-import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useState, useEffect } from 'react';
 import { teamService } from '../../../src/services/teamService';
 
 const TEAM_COLORS = [
@@ -17,18 +17,34 @@ const TEAM_COLORS = [
   '#000000', // Black
 ];
 
-export default function NewTeam() {
+export default function EditTeam() {
   const router = useRouter();
+  const { id } = useLocalSearchParams();
   const theme = useTheme();
   const [name, setName] = useState('');
   const [selectedColor, setSelectedColor] = useState(TEAM_COLORS[0]);
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    const loadTeam = async () => {
+      if (typeof id === 'string') {
+        const team = await teamService.getById(id);
+        if (team) {
+          setName(team.name);
+          setSelectedColor(team.color);
+        }
+      }
+      setLoading(false);
+    };
+    loadTeam();
+  }, [id]);
+
   const handleSave = async () => {
-    if (!name.trim()) return;
+    if (!name.trim() || typeof id !== 'string') return;
     setSaving(true);
     try {
-      await teamService.create(name, selectedColor);
+      await teamService.update(id, { name, color: selectedColor });
       router.back();
     } catch (e) {
       console.error(e);
@@ -37,11 +53,19 @@ export default function NewTeam() {
     }
   };
 
+  if (loading) {
+    return (
+      <View className="flex-1 justify-center items-center" style={{ backgroundColor: theme.colors.background }}>
+        <Text>Carregando...</Text>
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
       <Appbar.Header>
         <Appbar.BackAction onPress={() => router.back()} />
-        <Appbar.Content title="Novo Time" />
+        <Appbar.Content title="Editar Time" />
       </Appbar.Header>
 
       <View className="p-4 gap-6">
@@ -80,7 +104,7 @@ export default function NewTeam() {
           disabled={!name.trim() || saving}
           style={{ marginTop: 16, backgroundColor: selectedColor }}
         >
-          Salvar Time
+          Salvar Alterações
         </Button>
       </View>
     </View>

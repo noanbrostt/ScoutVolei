@@ -1,0 +1,2 @@
+ALTER TABLE `teams` ADD `color` text DEFAULT '#2196F3' NOT NULL;
+ALTER TABLE `teams` DROP COLUMN `city`;
