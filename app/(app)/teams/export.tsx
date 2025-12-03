@@ -21,7 +21,6 @@ export default function ExportTeam() {
   const [includeRG, setIncludeRG] = useState(false);
   const [includeCPF, setIncludeCPF] = useState(false);
   const [includeBirthday, setIncludeBirthday] = useState(false);
-  const [includeAllergies, setIncludeAllergies] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -66,16 +65,13 @@ export default function ExportTeam() {
 
   const generateText = () => {
     const data = getExportData();
-    let text = `Lista de Atletas - ${team?.name}\n`;
-    text += `Gerado em: ${new Date().toLocaleDateString()}\n\n`;
+    let text = `Lista de Atletas - ${team?.name}\n\n`;
 
     data.forEach((p, index) => {
       text += `${index + 1}. ${p.name}`;
-      if (p.number) text += ` (#${p.number})`;
       if (includeRG && p.rg) text += ` - RG: ${p.rg}`;
       if (includeCPF && p.cpf) text += ` - CPF: ${p.cpf}`;
       if (includeBirthday && p.birthday) text += ` - Nasc: ${p.birthday}`;
-      if (includeAllergies && p.allergies) text += ` - Obs: ${p.allergies}`;
       text += '\n';
     });
 
@@ -111,18 +107,15 @@ export default function ExportTeam() {
         </head>
         <body>
           <h1>${team?.name}</h1>
-          <div class="meta">Lista de Atletas - ${new Date().toLocaleDateString()}</div>
           
           <table>
             <thead>
               <tr>
                 <th>#</th>
                 <th>Nome</th>
-                <th>Camisa</th>
                 ${includeRG ? '<th>RG</th>' : ''}
                 ${includeCPF ? '<th>CPF</th>' : ''}
                 ${includeBirthday ? '<th>Nascimento</th>' : ''}
-                ${includeAllergies ? '<th>Observações</th>' : ''}
               </tr>
             </thead>
             <tbody>
@@ -130,11 +123,9 @@ export default function ExportTeam() {
                 <tr>
                   <td>${i + 1}</td>
                   <td>${p.name}</td>
-                  <td>${p.number}</td>
                   ${includeRG ? `<td>${p.rg || '-'}</td>` : ''}
                   ${includeCPF ? `<td>${p.cpf || '-'}</td>` : ''}
                   ${includeBirthday ? `<td>${p.birthday || '-'}</td>` : ''}
-                  ${includeAllergies ? `<td>${p.allergies || '-'}</td>` : ''}
                 </tr>
               `).join('')}
             </tbody>
@@ -167,7 +158,6 @@ export default function ExportTeam() {
           <Chip selected={includeRG} onPress={() => setIncludeRG(!includeRG)} showSelectedOverlay>RG</Chip>
           <Chip selected={includeCPF} onPress={() => setIncludeCPF(!includeCPF)} showSelectedOverlay>CPF</Chip>
           <Chip selected={includeBirthday} onPress={() => setIncludeBirthday(!includeBirthday)} showSelectedOverlay>Nascimento</Chip>
-          <Chip selected={includeAllergies} onPress={() => setIncludeAllergies(!includeAllergies)} showSelectedOverlay>Alergias</Chip>
         </View>
 
         <Divider style={{ marginVertical: 12 }} />

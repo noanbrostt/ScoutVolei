@@ -80,6 +80,7 @@ export default function TeamDetails() {
         <FlatList
           data={players}
           keyExtractor={(item) => item.id}
+          contentContainerStyle={{ paddingBottom: 100 }}
           renderItem={({ item }) => (
             <List.Item
               title={`${item.number} - ${item.surname || item.name}`}
