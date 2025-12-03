@@ -15,6 +15,8 @@ const TEAM_COLORS = [
   '#795548', // Brown
   '#607D8B', // Blue Grey
   '#000000', // Black
+  '#E91E63', // Pink
+  '#3F51B5', // Indigo
 ];
 
 export default function NewTeam() {
@@ -53,8 +55,8 @@ export default function NewTeam() {
         />
         
         <View>
-          <Text variant="titleMedium" style={{ marginBottom: 8 }}>Cor do Time</Text>
-          <View className="flex-row flex-wrap gap-4">
+          <Text variant="titleMedium" style={{ marginBottom: 8, textAlign: 'center' }}>Cor do Time</Text>
+          <View className="flex-row flex-wrap gap-4 justify-center">
             {TEAM_COLORS.map((color) => (
               <TouchableOpacity
                 key={color}

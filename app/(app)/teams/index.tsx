@@ -41,7 +41,7 @@ export default function TeamsList() {
             Meus Times
           </Text>
           <Text variant="bodyMedium" style={{ opacity: 0.7 }}>
-            Gerencie seus elencos e atletas
+            Gerencie seus times e atletas
           </Text>
         </View>
       </SafeAreaView>

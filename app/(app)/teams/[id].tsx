@@ -105,7 +105,7 @@ export default function TeamDetails() {
       <View className="flex-1 px-4 pt-4">
         <View className="flex-row justify-between items-center mb-2">
           <Text variant="titleMedium" style={{ fontWeight: 'bold', opacity: 0.7 }}>
-            Elenco ({filteredPlayers.length})
+            Atletas ({filteredPlayers.length})
           </Text>
           <View className="flex-row items-center">
             {selectedPositions.length > 0 && (
@@ -223,6 +223,7 @@ export default function TeamDetails() {
                      mode="flat"
                      selected={isSelected}
                      showSelectedOverlay={false}
+                     icon={() => null} // Force no icon
                      onPress={() => togglePositionFilter(pos)}
                      style={{ 
                        margin: 4,

@@ -18,6 +18,7 @@ export default function ExportTeam() {
 
   // Selection States
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+  const [includeNumber, setIncludeNumber] = useState(false);
   const [includeRG, setIncludeRG] = useState(false);
   const [includeCPF, setIncludeCPF] = useState(false);
   const [includeBirthday, setIncludeBirthday] = useState(false);
@@ -69,6 +70,7 @@ export default function ExportTeam() {
 
     data.forEach((p, index) => {
       text += `${index + 1}. ${p.name}`;
+      if (includeNumber && p.number) text += ` (#${p.number})`;
       if (includeRG && p.rg) text += ` - RG: ${p.rg}`;
       if (includeCPF && p.cpf) text += ` - CPF: ${p.cpf}`;
       if (includeBirthday && p.birthday) text += ` - Nasc: ${p.birthday}`;
@@ -113,6 +115,7 @@ export default function ExportTeam() {
               <tr>
                 <th>#</th>
                 <th>Nome</th>
+                ${includeNumber ? '<th>Camisa</th>' : ''}
                 ${includeRG ? '<th>RG</th>' : ''}
                 ${includeCPF ? '<th>CPF</th>' : ''}
                 ${includeBirthday ? '<th>Nascimento</th>' : ''}
@@ -123,6 +126,7 @@ export default function ExportTeam() {
                 <tr>
                   <td>${i + 1}</td>
                   <td>${p.name}</td>
+                  ${includeNumber ? `<td>${p.number}</td>` : ''}
                   ${includeRG ? `<td>${p.rg || '-'}</td>` : ''}
                   ${includeCPF ? `<td>${p.cpf || '-'}</td>` : ''}
                   ${includeBirthday ? `<td>${p.birthday || '-'}</td>` : ''}
@@ -156,6 +160,7 @@ export default function ExportTeam() {
         <Text variant="titleMedium" style={{ marginBottom: 8, fontWeight: 'bold' }}>Dados para incluir:</Text>
         <View className="flex-row flex-wrap gap-2 mb-4">
           {[
+            { label: 'Camisa', value: includeNumber, setter: setIncludeNumber },
             { label: 'RG', value: includeRG, setter: setIncludeRG },
             { label: 'CPF', value: includeCPF, setter: setIncludeCPF },
             { label: 'Nascimento', value: includeBirthday, setter: setIncludeBirthday },
@@ -164,6 +169,7 @@ export default function ExportTeam() {
               key={option.label}
               selected={option.value}
               showSelectedOverlay={false}
+              icon={() => null} // Force no icon
               onPress={() => option.setter(!option.value)}
               style={{
                 backgroundColor: option.value ? theme.colors.primary : theme.colors.surfaceVariant,
