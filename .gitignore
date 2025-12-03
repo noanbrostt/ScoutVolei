@@ -1,0 +1,16 @@
+node_modules/
+.expo/
+dist/
+.env
+*.jks
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# MacOS
+.DS_Store
+
+# TypeScript
+*.tsbuildinfo

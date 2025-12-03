@@ -1,0 +1,31 @@
+import { db } from '../database/db';
+import { players } from '../database/schemas';
+import { eq, asc } from 'drizzle-orm';
+import * as Crypto from 'expo-crypto';
+
+export const playerService = {
+  getByTeamId: async (teamId: string) => {
+    // Order by number
+    return await db.select().from(players).where(eq(players.teamId, teamId)).orderBy(asc(players.number));
+  },
+
+  create: async (data: { teamId: string, name: string, surname?: string, number: number, position: string }) => {
+    const newPlayer = {
+      id: Crypto.randomUUID(),
+      teamId: data.teamId,
+      name: data.name,
+      surname: data.surname || null,
+      number: data.number,
+      position: data.position,
+      createdAt: new Date().toISOString(),
+      syncStatus: 'pending' as const,
+    };
+    
+    await db.insert(players).values(newPlayer);
+    return newPlayer;
+  },
+  
+  delete: async (id: string) => {
+    await db.delete(players).where(eq(players.id, id));
+  }
+};
