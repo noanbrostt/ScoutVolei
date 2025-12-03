@@ -1,7 +1,8 @@
 import { View, FlatList, RefreshControl } from 'react-native';
-import { Text, List, FAB, useTheme } from 'react-native-paper';
+import { Text, FAB, useTheme, Avatar, Card, Surface } from 'react-native-paper';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { teamService } from '../../../src/services/teamService';
 
 export default function TeamsList() {
@@ -28,20 +29,35 @@ export default function TeamsList() {
     }, [])
   );
 
+  const getInitials = (name: string) => {
+    return name.substring(0, 2).toUpperCase();
+  };
+
   return (
     <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-      <Text variant="headlineMedium" style={{ margin: 16, color: theme.colors.primary, fontWeight: 'bold' }}>
-        Meus Times
-      </Text>
+      <SafeAreaView edges={['top']}>
+        <View className="px-4 pt-4 pb-2">
+          <Text variant="displaySmall" style={{ fontWeight: 'bold', color: theme.colors.primary }}>
+            Meus Times
+          </Text>
+          <Text variant="bodyMedium" style={{ opacity: 0.7 }}>
+            Gerencie seus elencos e atletas
+          </Text>
+        </View>
+      </SafeAreaView>
       
       {teams.length === 0 && !loading ? (
         <View className="flex-1 items-center justify-center p-8">
-          <Text variant="bodyLarge" style={{ opacity: 0.6, textAlign: 'center', marginBottom: 16 }}>
-            Nenhum time cadastrado ainda.
+          <Text variant="headlineSmall" style={{ fontWeight: 'bold', color: theme.colors.secondary }}>
+            Nenhum time ainda
+          </Text>
+          <Text variant="bodyMedium" style={{ textAlign: 'center', marginTop: 8, marginBottom: 24, opacity: 0.7 }}>
+            Cadastre seu primeiro time para começar a registrar scouts e estatísticas.
           </Text>
           <FAB
              icon="plus"
-             label="Criar Time"
+             label="Criar Novo Time"
+             extended
              onPress={() => router.push('/(app)/teams/new')}
           />
         </View>
@@ -49,15 +65,29 @@ export default function TeamsList() {
         <FlatList
           data={teams}
           keyExtractor={(item) => item.id}
+          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={loadTeams} />}
           renderItem={({ item }) => (
-            <List.Item
-              title={item.name}
-              left={props => <List.Icon {...props} icon="tshirt-crew" color={item.color} />}
-              right={props => <List.Icon {...props} icon="chevron-right" />}
+            <Card 
+              mode="elevated" 
               onPress={() => router.push(`/(app)/teams/${item.id}`)}
-              style={{ backgroundColor: theme.colors.surface, marginBottom: 1 }}
-            />
+              style={{ marginBottom: 12, backgroundColor: theme.colors.elevation.level1 }}
+            >
+              <View className="flex-row items-center p-4">
+                <Avatar.Text 
+                  size={40}
+                  label={getInitials(item.name)} 
+                  style={{ backgroundColor: item.color || theme.colors.primary, marginRight: 16 }} 
+                  color="#FFF"
+                />
+                <View className="flex-1 justify-center">
+                  <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>
+                    {item.name}
+                  </Text>
+                </View>
+                <Avatar.Icon icon="chevron-right" size={24} style={{ backgroundColor: 'transparent' }} color={theme.colors.onSurfaceVariant} />
+              </View>
+            </Card>
           )}
         />
       )}
@@ -70,8 +100,9 @@ export default function TeamsList() {
             margin: 16,
             right: 0,
             bottom: 0,
-            backgroundColor: theme.colors.primaryContainer
+            backgroundColor: theme.colors.primary
           }}
+          color="#FFF"
           onPress={() => router.push('/(app)/teams/new')}
         />
       )}

@@ -155,9 +155,29 @@ export default function ExportTeam() {
         {/* Options Section */}
         <Text variant="titleMedium" style={{ marginBottom: 8, fontWeight: 'bold' }}>Dados para incluir:</Text>
         <View className="flex-row flex-wrap gap-2 mb-4">
-          <Chip selected={includeRG} onPress={() => setIncludeRG(!includeRG)} showSelectedOverlay>RG</Chip>
-          <Chip selected={includeCPF} onPress={() => setIncludeCPF(!includeCPF)} showSelectedOverlay>CPF</Chip>
-          <Chip selected={includeBirthday} onPress={() => setIncludeBirthday(!includeBirthday)} showSelectedOverlay>Nascimento</Chip>
+          {[
+            { label: 'RG', value: includeRG, setter: setIncludeRG },
+            { label: 'CPF', value: includeCPF, setter: setIncludeCPF },
+            { label: 'Nascimento', value: includeBirthday, setter: setIncludeBirthday },
+          ].map((option) => (
+            <Chip
+              key={option.label}
+              selected={option.value}
+              showSelectedOverlay={false}
+              onPress={() => option.setter(!option.value)}
+              style={{
+                backgroundColor: option.value ? theme.colors.primary : theme.colors.surfaceVariant,
+                borderColor: option.value ? theme.colors.primary : 'transparent',
+                borderWidth: 1
+              }}
+              textStyle={{
+                color: option.value ? '#FFF' : theme.colors.onSurfaceVariant,
+                fontWeight: option.value ? 'bold' : 'normal'
+              }}
+            >
+              {option.label}
+            </Chip>
+          ))}
         </View>
 
         <Divider style={{ marginVertical: 12 }} />

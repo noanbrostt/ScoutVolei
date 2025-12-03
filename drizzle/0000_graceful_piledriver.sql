@@ -20,7 +20,7 @@ CREATE TABLE `matches` (
 	`location` text,
 	`our_score` integer DEFAULT 0,
 	`opponent_score` integer DEFAULT 0,
-	`is_finished` integer DEFAULT false,
+	`is_finished` integer DEFAULT 0,
 	`created_at` text NOT NULL,
 	`sync_status` text DEFAULT 'pending' NOT NULL,
 	FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`) ON UPDATE no action ON DELETE no action

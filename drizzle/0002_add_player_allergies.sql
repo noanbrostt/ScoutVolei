@@ -1,1 +1,1 @@
-ALTER TABLE `players` ADD `allergies` text;
+ALTER TABLE players ADD COLUMN allergies TEXT;
