@@ -1,4 +1,4 @@
-import { View, StatusBar, Platform, ScrollView } from 'react-native';
+import { View, StatusBar, Platform, ScrollView, FlatList, Alert } from 'react-native';
 import { Text, Button, IconButton, useTheme, Portal, Dialog, RadioButton, Surface, TouchableRipple } from 'react-native-paper';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useState, useEffect, useCallback } from 'react';
@@ -40,6 +40,7 @@ export default function ScoutScreen() {
   const [match, setMatch] = useState<any>(null);
   const [allPlayers, setAllPlayers] = useState<any[]>([]);
   const [activePlayers, setActivePlayers] = useState<any[]>([]);
+  const [recentActions, setRecentActions] = useState<any[]>([]);
   
   // Selection State
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
@@ -51,6 +52,12 @@ export default function ScoutScreen() {
   const [subModalVisible, setSubModalVisible] = useState(false);
   const [subOutId, setSubOutId] = useState<string | null>(null);
   const [subInId, setSubInId] = useState<string | null>(null);
+
+  // Action Log Edit/Delete State
+  const [editActionDetailsModalVisible, setEditActionDetailsModalVisible] = useState(false);
+  const [selectedLogAction, setSelectedLogAction] = useState<any>(null); // The action object from the log
+  const [editingActionType, setEditingActionType] = useState('');
+  const [editingQuality, setEditingQuality] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -82,6 +89,7 @@ export default function ScoutScreen() {
       if (m) {
           const p = await playerService.getByTeamId(m.teamId);
           setAllPlayers(p);
+          loadActions(id);
           
           let activeIds: string[] = [];
           if (initialLineup && typeof initialLineup === 'string') {
@@ -99,6 +107,11 @@ export default function ScoutScreen() {
       }
   };
 
+  const loadActions = async (id: string) => {
+      const actions = await matchService.getActions(id);
+      setRecentActions(actions);
+  };
+
   const sortActivePlayers = (players: any[]) => {
       const sorted = [...players].sort((a, b) => {
           const posA = POSITION_ORDER[a.position] || 99;
@@ -112,7 +125,33 @@ export default function ScoutScreen() {
       if (match) {
           const updatedMatch = await matchService.getById(match.id);
           setMatch(updatedMatch);
+          loadActions(match.id);
       }
+  };
+
+  const handleDeleteAction = (actionId: string) => {
+      Alert.alert('Desfazer Ação', 'Deseja excluir esta ação e reverter a pontuação?', [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Excluir', style: 'destructive', onPress: async () => {
+              await matchService.deleteAction(actionId);
+              refreshMatch();
+              setEditActionDetailsModalVisible(false); // Close modal after delete
+          }}
+      ]);
+  };
+  
+  const handleUpdateActionDetails = async () => {
+      if (!selectedLogAction) return;
+      await matchService.updateActionDetails(selectedLogAction.id, editingActionType, editingQuality);
+      refreshMatch();
+      setEditActionDetailsModalVisible(false);
+  };
+
+  const handleActionLogPress = (action: any) => {
+      setSelectedLogAction(action);
+      setEditingActionType(action.actionType);
+      setEditingQuality(action.quality);
+      setEditActionDetailsModalVisible(true);
   };
 
   // --- Core Logic: Register Action ---
@@ -215,53 +254,54 @@ export default function ScoutScreen() {
         
         {/* TOP BAR */}
         <View className="h-14 flex-row items-center px-4 justify-between bg-gray-800 border-b border-gray-700">
-            <View className="flex-row items-center gap-4">
+            {/* Substituir Button (Left) */}
+            <Button 
+                mode="contained-tonal" 
+                compact 
+                icon="swap-horizontal" // Re-added icon
+                onPress={() => setSubModalVisible(true)}
+                labelStyle={{ fontSize: 12, marginHorizontal: 0 }} // More compact label
+                style={{ height: 36, justifyContent: 'center', paddingHorizontal: 8 }} // Adjusted height and padding
+            >
+                Substituir
+            </Button>
+            
+            {/* Score and Generic Points (Center) */}
+            <View className="flex-row items-center gap-2">
+                <Button 
+                    mode="contained" 
+                    compact
+                    buttonColor="#1B5E20" 
+                    onPress={() => handleGenericPoint('our')}
+                    labelStyle={{ fontSize: 12, marginHorizontal: 8 }} 
+                    textColor="#FFF" // Explicitly white
+                >
+                    +1 NÓS
+                </Button>
                 <Text variant="titleMedium" style={{ color: theme.colors.primary, fontWeight: 'bold' }}>
                     {match.ourScore} x {match.opponentScore}
                 </Text>
-                
-                {/* Generic Points in Top Bar */}
-                <View className="flex-row gap-2 ml-4">
-                    <Button 
-                        mode="contained" 
-                        compact
-                        buttonColor="#1B5E20" 
-                        onPress={() => handleGenericPoint('our')}
-                        labelStyle={{ fontSize: 12, marginHorizontal: 8 }}
-                    >
-                        +1 NÓS
-                    </Button>
-                    <Button 
-                        mode="contained" 
-                        compact
-                        buttonColor="#B71C1C" 
-                        onPress={() => handleGenericPoint('opponent')}
-                        labelStyle={{ fontSize: 12, marginHorizontal: 8 }}
-                    >
-                        +1 DELES
-                    </Button>
-                </View>
+                <Button 
+                    mode="contained" 
+                    compact
+                    buttonColor="#B71C1C" 
+                    onPress={() => handleGenericPoint('opponent')}
+                    labelStyle={{ fontSize: 12, marginHorizontal: 8 }} 
+                    textColor="#FFF" // Explicitly white
+                >
+                    +1 DELES
+                </Button>
             </View>
             
-            <View className="flex-row gap-2">
-                <Button 
-                    mode="contained-tonal" 
-                    compact 
-                    icon="swap-horizontal" 
-                    onPress={() => setSubModalVisible(true)}
-                    labelStyle={{ fontSize: 12 }}
-                >
-                    Substituir
-                </Button>
-                <IconButton icon="close" size={20} onPress={() => router.replace('/(app)/history')} />
-            </View>
+            {/* Close Button (Right) */}
+            <IconButton icon="close" size={20} onPress={() => router.replace('/(app)/history')} />
         </View>
 
         {/* MAIN CONTENT */}
         <View className="flex-1 flex-row">
             
-            {/* LEFT: PLAYERS */}
-            <View className="w-[28%] flex-col p-2 border-r border-gray-700">
+            {/* LEFT: PLAYERS (25%) */}
+            <View className="w-[25%] flex-col p-2 border-r border-gray-700">
                 <View className="flex-1 gap-2">
                     {activePlayers.map(p => (
                         <TouchableRipple
@@ -284,7 +324,7 @@ export default function ScoutScreen() {
                                     color: selectedPlayerId === p.id ? '#FFF' : '#E0E0E0', 
                                     fontWeight: 'bold',
                                     textAlign: 'left',
-                                    fontSize: 18 
+                                    fontSize: 16 
                                 }}
                             >
                                 {(p.surname || p.name || "").toUpperCase()}
@@ -294,13 +334,53 @@ export default function ScoutScreen() {
                 </View>
             </View>
 
-            {/* RIGHT: ACTION MATRIX */}
+            {/* MIDDLE: LOG (20%) */}
+            <View className="w-[20%] bg-gray-800 border-r border-gray-700">
+                <Text style={{ color: '#AAA', textAlign: 'center', padding: 4, fontSize: 10, fontWeight: 'bold' }}>HISTÓRICO</Text>
+                <FlatList
+                    data={recentActions}
+                    keyExtractor={item => item.id}
+                    contentContainerStyle={{ padding: 4 }}
+                    renderItem={({ item }) => {
+                        const player = allPlayers.find(p => p.id === item.playerId);
+                        let color = '#BBB'; // Default Grey
+                        if (item.scoreChange > 0) color = '#4CAF50'; // Green
+                        if (item.scoreChange < 0) color = '#F44336'; // Red
+
+                        return (
+                            <TouchableRipple 
+                                onPress={() => handleActionLogPress(item)} // Changed to handleActionLogPress
+                                style={{ 
+                                    marginBottom: 4, 
+                                    padding: 6, 
+                                    borderRadius: 4, 
+                                    backgroundColor: '#333',
+                                    borderLeftWidth: 3,
+                                    borderLeftColor: color
+                                }}
+                            >
+                                <View>
+                                    <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 12 }}>
+                                        {player ? (player.surname || player.name).toUpperCase() : 'GERAL'}
+                                    </Text>
+                                    <View className="flex-row justify-between">
+                                        <Text style={{ color: '#CCC', fontSize: 10 }}>{item.actionType}</Text>
+                                        <Text style={{ color: color, fontWeight: 'bold', fontSize: 10 }}>{item.quality}</Text>
+                                    </View>
+                                </View>
+                            </TouchableRipple>
+                        );
+                    }}
+                />
+            </View>
+
+            {/* RIGHT: ACTION MATRIX (Flex) */}
             <View className="flex-1 p-1 bg-black">
                 {ACTIONS.map((action) => (
                     <View key={action.key} className="flex-1 flex-row mb-1 gap-1">
                         {/* Label Column */}
-                        <View className="w-16 justify-center items-center bg-gray-800 rounded">
-                            <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 12 }}>{action.label}</Text>
+                        <View className="w-14 justify-center items-center bg-gray-800 rounded">
+                            <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 11 }}>{action.label}</Text>
                         </View>
                         
                         {/* Quality Buttons */}
@@ -312,17 +392,17 @@ export default function ScoutScreen() {
                                     onPress={() => handleActionClick(action.key, q.val)}
                                     style={{ 
                                         flex: 1, 
-                                        backgroundColor: isActive ? q.color : '#1A1A1A', // Darker default
+                                        backgroundColor: isActive ? q.color : '#1A1A1A', 
                                         borderRadius: 4,
                                         justifyContent: 'center',
                                         alignItems: 'center',
                                         borderWidth: isActive ? 2 : 1,
-                                        borderColor: isActive ? '#FFF' : q.color // Border is color
+                                        borderColor: isActive ? '#FFF' : q.color 
                                     }}
                                 >
                                     <Text style={{ 
                                         color: isActive ? '#FFF' : q.color, 
-                                        fontSize: 20, 
+                                        fontSize: 18, 
                                         fontWeight: 'bold' 
                                     }}>
                                         {q.label}
@@ -398,6 +478,78 @@ export default function ScoutScreen() {
                 </Dialog.Actions>
             </Dialog>
         </Portal>
+        
+        {/* Edit Action Details Modal */}
+        <Portal>
+            <Dialog visible={editActionDetailsModalVisible} onDismiss={() => setEditActionDetailsModalVisible(false)} style={{ maxHeight: '90%' }}>
+                <Dialog.Title style={{ fontSize: 18, paddingBottom: 10 }}>Editar Ação</Dialog.Title>
+                <Dialog.Content>
+                    {selectedLogAction && (
+                        <View>
+                            <Text variant="titleMedium" style={{ marginBottom: 12 }}>
+                                Jogador: {allPlayers.find(p => p.id === selectedLogAction.playerId)?.surname.toUpperCase() || 'GERAL'}
+                            </Text>
+
+                            <Text variant="labelLarge" style={{ marginBottom: 8 }}>Tipo de Ação:</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                                <View className="flex-row gap-2">
+                                    {ACTIONS.map((act) => (
+                                        <Button
+                                            key={act.key}
+                                            mode={editingActionType === act.key ? 'contained' : 'outlined'}
+                                            onPress={() => setEditingActionType(act.key)}
+                                            compact
+                                            style={{ minWidth: 60 }}
+                                        >
+                                            {act.label}
+                                        </Button>
+                                    ))}
+                                </View>
+                            </ScrollView>
+
+                            <Text variant="labelLarge" style={{ marginBottom: 8 }}>Qualidade:</Text>
+                            <View className="flex-row justify-around gap-2">
+                                {QUALITIES.map((q) => (
+                                    <Button 
+                                        key={q.val}
+                                        mode={editingQuality === q.val ? 'contained' : 'outlined'} 
+                                        buttonColor={editingQuality === q.val ? q.color : undefined}
+                                        onPress={() => setEditingQuality(q.val)}
+                                        style={{ flex: 1 }}
+                                    >
+                                        {q.label}
+                                    </Button>
+                                ))}
+                            </View>
+                        </View>
+                    )}
+                </Dialog.Content>
+                <Dialog.Actions className="flex-col gap-2 p-4">
+                    <Button 
+                        mode="contained" 
+                        onPress={handleUpdateActionDetails}
+                        style={{ width: '100%' }}
+                        disabled={!selectedLogAction || !editingActionType}
+                    >
+                        Salvar Edição
+                    </Button>
+                    <Button 
+                        mode="outlined" 
+                        onPress={() => handleDeleteAction(selectedLogAction.id)}
+                        textColor={theme.colors.error}
+                        style={{ width: '100%' }}
+                    >
+                        Excluir Ação
+                    </Button>
+                    <Button 
+                        mode="text" 
+                        onPress={() => setEditActionDetailsModalVisible(false)}
+                        style={{ width: '100%' }}
+                    >
+                        Cancelar
+                    </Button>
+                </Dialog.Actions>
+            </Dialog>
+        </Portal>
     </View>
-  );
-}
+  )};
