@@ -8,6 +8,8 @@ import { db } from '../src/database/db';
 import migrations from '../drizzle/migrations';
 import { View, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function RootLayout() {
   const { mode } = useThemeStore();
@@ -17,6 +19,11 @@ export default function RootLayout() {
 
   const { success, error } = useMigrations(db, migrations);
 
+  const [fontsLoaded] = useFonts({
+    ...MaterialIcons.font,
+    ...MaterialCommunityIcons.font,
+  });
+
   if (error) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -25,10 +32,10 @@ export default function RootLayout() {
     );
   }
 
-  if (!success) {
+  if (!success || !fontsLoaded) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Loading Database...</Text>
+        <Text>Loading...</Text>
       </View>
     );
   }

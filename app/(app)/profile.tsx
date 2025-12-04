@@ -1,8 +1,8 @@
 import { View, Alert } from 'react-native';
 import { Text, Button, List, Switch, useTheme, Divider } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { useThemeStore } from '../../../src/store/themeStore';
-import { syncService } from '../../../src/services/syncService';
+import { useThemeStore } from '../../src/store/themeStore';
+import { syncService } from '../../src/services/syncService';
 
 export default function Profile() {
   const theme = useTheme();

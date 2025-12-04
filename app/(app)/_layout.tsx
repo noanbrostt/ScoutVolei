@@ -1,9 +1,10 @@
 import { Tabs } from 'expo-router';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
 
 export default function AppLayout() {
   const theme = useTheme();
+  console.log("Renderizando App Layout Tabs");
 
   return (
     <Tabs
@@ -12,6 +13,8 @@ export default function AppLayout() {
         tabBarActiveTintColor: theme.colors.primary,
         tabBarStyle: {
           backgroundColor: theme.colors.elevation.level2,
+          borderTopWidth: 0,
+          elevation: 5,
         },
       }}
     >
@@ -19,28 +22,32 @@ export default function AppLayout() {
         name="dashboard"
         options={{
           title: 'Início',
-          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="home" size={24} color={color} />,
+          tabBarLabel: 'Início',
+          tabBarIcon: ({ color }) => <MaterialIcons name="home" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="teams"
         options={{
           title: 'Times',
-          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="tshirt-crew" size={24} color={color} />,
+          tabBarLabel: 'Times',
+          tabBarIcon: ({ color }) => <MaterialIcons name="groups" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="history"
         options={{
-          title: 'Histórico',
-          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="history" size={24} color={color} />,
+          title: 'Partidas',
+          tabBarLabel: 'Partidas',
+          tabBarIcon: ({ color }) => <MaterialIcons name="sports-volleyball" size={24} color={color} />,
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Perfil',
-          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="account" size={24} color={color} />,
+          title: 'Configurações',
+          tabBarLabel: 'Configurações',
+          tabBarIcon: ({ color }) => <MaterialIcons name="settings" size={24} color={color} />,
         }}
       />
     </Tabs>
