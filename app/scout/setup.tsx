@@ -63,8 +63,8 @@ export default function ScoutSetup() {
   };
 
   const handleStart = async () => {
-    if (selectedPlayerIds.length < 6) {
-      Alert.alert('Atenção', 'Selecione pelo menos 6 atletas para iniciar (Titulares).');
+    if (selectedPlayerIds.length < 7) {
+      Alert.alert('Atenção', 'Selecione exatamente 7 atletas (6 Titulares + 1 Líbero) para iniciar.');
       return;
     }
 
@@ -191,14 +191,13 @@ export default function ScoutSetup() {
 
            <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.colors.surface }}>
              <View className="p-4 pt-2 border-t border-gray-200">
-               <Button 
-                 mode="contained" 
-                 onPress={handleStart} 
-                 loading={loading}
-                 disabled={selectedPlayerIds.length < 6 || loading}
-                 style={{ paddingVertical: 6 }}
-               >
-                 Iniciar Partida
+                            <Button 
+                              mode="contained" 
+                              onPress={handleStart} 
+                              loading={loading}
+                              disabled={selectedPlayerIds.length < 7 || loading}
+                              style={{ paddingVertical: 6 }}
+                            >                 Iniciar Partida
                </Button>
              </View>
            </SafeAreaView>

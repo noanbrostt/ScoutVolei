@@ -3,18 +3,18 @@ import { Text, Button, IconButton, useTheme, Portal, Dialog, RadioButton, Surfac
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useState, useEffect, useCallback } from 'react';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import * as NavigationBar from 'expo-navigation-bar';
 import { matchService } from '../../../src/services/matchService';
 import { playerService } from '../../../src/services/playerService';
+import * as NavigationBar from 'expo-navigation-bar';
 
 // Actions Config
 const ACTIONS = [
     { label: 'SAQUE', key: 'Saque' },
     { label: 'PASSE', key: 'Passe' },
-    { label: 'LEV', key: 'Levantamento' },
     { label: 'ATQ', key: 'Ataque' },
-    { label: 'BLOQ', key: 'Bloqueio' },
+    { label: 'LEV', key: 'Levantamento' },
     { label: 'DEF', key: 'Defesa' },
+    { label: 'BLOQ', key: 'Bloqueio' },
 ];
 
 const QUALITIES = [
@@ -23,6 +23,14 @@ const QUALITIES = [
     { val: 2, color: '#FBC02D', label: '2' }, // Yellow
     { val: 3, color: '#388E3C', label: '3' }, // Green
 ];
+
+const POSITION_ORDER: Record<string, number> = {
+    'Ponteiro': 1,
+    'Líbero': 2,
+    'Levantador': 3,
+    'Oposto': 4,
+    'Central': 5
+};
 
 export default function ScoutScreen() {
   const { matchId, initialLineup } = useLocalSearchParams();
@@ -48,12 +56,13 @@ export default function ScoutScreen() {
     useCallback(() => {
       // Force Landscape & Immersive Mode
       ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+      StatusBar.setHidden(true);
       if (Platform.OS === 'android') {
         NavigationBar.setVisibilityAsync("hidden");
-        NavigationBar.setBehaviorAsync("overlay-swipe");
       }
       return () => {
         ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT);
+        StatusBar.setHidden(false);
         if (Platform.OS === 'android') {
             NavigationBar.setVisibilityAsync("visible");
         }
@@ -79,12 +88,24 @@ export default function ScoutScreen() {
             try { activeIds = JSON.parse(initialLineup); } catch (e) {}
           }
           
+          let actives = [];
           if (activeIds.length > 0) {
-            setActivePlayers(p.filter(pl => activeIds.includes(pl.id)));
+            actives = p.filter(pl => activeIds.includes(pl.id));
           } else {
-             setActivePlayers(p.slice(0, 6));
+             actives = p.slice(0, 7);
           }
+
+          sortActivePlayers(actives);
       }
+  };
+
+  const sortActivePlayers = (players: any[]) => {
+      const sorted = [...players].sort((a, b) => {
+          const posA = POSITION_ORDER[a.position] || 99;
+          const posB = POSITION_ORDER[b.position] || 99;
+          return posA - posB;
+      });
+      setActivePlayers(sorted);
   };
 
   const refreshMatch = async () => {
@@ -173,7 +194,8 @@ export default function ScoutScreen() {
       return p;
     });
     
-    setActivePlayers(newActive);
+    sortActivePlayers(newActive);
+    
     setSubModalVisible(false);
     setSubOutId(null);
     setSubInId(null);
@@ -316,12 +338,23 @@ export default function ScoutScreen() {
         {/* SUBSTITUTION MODAL */}
         <Portal>
             <Dialog visible={subModalVisible} onDismiss={() => setSubModalVisible(false)} style={{ maxHeight: '90%' }}>
-                <Dialog.Title style={{ fontSize: 18, paddingBottom: 0 }}>Substituição</Dialog.Title>
+                <Dialog.Title style={{ fontSize: 18, paddingBottom: 10 }}>Substituição</Dialog.Title>
                 <Dialog.Content>
-                    <ScrollView style={{ maxHeight: 300 }} contentContainerStyle={{ paddingBottom: 24 }}>
-                        <View className="flex-row justify-between min-h-[200px]">
+                    <View style={{ height: 200, overflow: 'hidden' }}> 
+                        {/* Headers Fixed */}
+                        <View className="flex-row justify-between border-b border-gray-200 pb-2 mb-2">
                             <View className="flex-1 mr-2">
-                                <Text variant="labelMedium" style={{marginBottom: 8, fontWeight: 'bold'}}>QUEM SAI</Text>
+                                <Text variant="labelMedium" style={{fontWeight: 'bold'}}>QUEM SAI</Text>
+                            </View>
+                            <View className="flex-1 ml-2 pl-2 border-l border-transparent">
+                                <Text variant="labelMedium" style={{fontWeight: 'bold'}}>QUEM ENTRA</Text>
+                            </View>
+                        </View>
+
+                        {/* Scrollable Lists Container */}
+                        <View className="flex-1 flex-row"> 
+                            {/* OUT List */}
+                            <ScrollView className="flex-1 mr-2" nestedScrollEnabled contentContainerStyle={{ paddingBottom: 16 }}>
                                 <RadioButton.Group onValueChange={v => setSubOutId(v)} value={subOutId || ''}>
                                     {activePlayers.map(p => (
                                         <RadioButton.Item 
@@ -329,15 +362,19 @@ export default function ScoutScreen() {
                                             label={(p.surname || p.name).toUpperCase()} 
                                             value={p.id} 
                                             mode="android" 
-                                            density="compact" // Compact density
-                                            style={{ paddingVertical: 2 }}
-                                            labelStyle={{ fontSize: 12 }}
+                                            density="compact"
+                                            style={{ paddingVertical: 4 }}
+                                            labelStyle={{ fontSize: 14 }}
                                         />
                                     ))}
                                 </RadioButton.Group>
-                            </View>
-                            <View className="flex-1 ml-2 border-l border-gray-200 pl-2">
-                                <Text variant="labelMedium" style={{marginBottom: 8, fontWeight: 'bold'}}>QUEM ENTRA</Text>
+                            </ScrollView>
+
+                            {/* Vertical Divider */}
+                            <View className="w-[1px] bg-gray-200 mx-1 h-full" />
+
+                            {/* IN List */}
+                            <ScrollView className="flex-1 ml-2" nestedScrollEnabled contentContainerStyle={{ paddingBottom: 16 }}>
                                 <RadioButton.Group onValueChange={v => setSubInId(v)} value={subInId || ''}>
                                     {getReservePlayers().map(p => (
                                         <RadioButton.Item 
@@ -346,14 +383,14 @@ export default function ScoutScreen() {
                                             value={p.id} 
                                             mode="android" 
                                             density="compact"
-                                            style={{ paddingVertical: 2 }}
-                                            labelStyle={{ fontSize: 12 }}
+                                            style={{ paddingVertical: 4 }}
+                                            labelStyle={{ fontSize: 14 }}
                                         />
                                     ))}
                                 </RadioButton.Group>
-                            </View>
+                            </ScrollView>
                         </View>
-                    </ScrollView>
+                    </View>
                 </Dialog.Content>
                 <Dialog.Actions>
                     <Button onPress={() => setSubModalVisible(false)}>Cancelar</Button>
