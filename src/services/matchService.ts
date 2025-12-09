@@ -1,5 +1,5 @@
 import { db } from '../database/db';
-import { matches, matchActions } from '../database/schemas';
+import { matches, matchActions, teams } from '../database/schemas';
 import { eq, desc } from 'drizzle-orm';
 import * as Crypto from 'expo-crypto';
 
@@ -27,13 +27,65 @@ export const matchService = {
   },
 
   getAll: async () => {
-    return await db.select().from(matches).orderBy(desc(matches.date));
+      // Fetch matches joined with team name
+      const matchesData = await db.select({
+          match: matches,
+          teamName: teams.name
+      })
+      .from(matches)
+      .leftJoin(teams, eq(matches.teamId, teams.id))
+      .orderBy(desc(matches.date));
+
+      // Calculate set scores for each match
+      // Note: This is a heavy operation for a long list, but optimized for MVP.
+      // In a production app with huge data, this should be pre-calculated in DB columns.
+      const allActions = await db.select({
+          matchId: matchActions.matchId,
+          setNumber: matchActions.setNumber,
+          scoreChange: matchActions.scoreChange
+      }).from(matchActions);
+
+      return matchesData.map(row => {
+          const mActions = allActions.filter(a => a.matchId === row.match.id);
+          
+          // Group by Set
+          const setScores: Record<number, { us: number, them: number }> = {};
+          
+          mActions.forEach(a => {
+              if (!setScores[a.setNumber]) setScores[a.setNumber] = { us: 0, them: 0 };
+              if (a.scoreChange > 0) setScores[a.setNumber].us++;
+              if (a.scoreChange < 0) setScores[a.setNumber].them++;
+          });
+
+          // Calculate Sets Won
+          let setsUs = 0;
+          let setsThem = 0;
+          
+          Object.values(setScores).forEach(score => {
+              if (score.us > score.them) setsUs++;
+              else if (score.them > score.us) setsThem++;
+          });
+
+          return {
+              ...row.match,
+              teamName: row.teamName || 'Meu Time',
+              setsUs,
+              setsThem
+          };
+      });
   },
 
   getActions: async (matchId: string) => {
     return await db.select().from(matchActions)
       .where(eq(matchActions.matchId, matchId))
       .orderBy(desc(matchActions.timestamp));
+  },
+
+  delete: async (matchId: string) => {
+      await db.transaction(async (tx) => {
+          await tx.delete(matchActions).where(eq(matchActions.matchId, matchId));
+          await tx.delete(matches).where(eq(matches.id, matchId));
+      });
   },
 
   deleteAction: async (actionId: string) => {
