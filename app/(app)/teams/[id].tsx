@@ -1,4 +1,4 @@
-import { View, FlatList, Alert, ScrollView } from 'react-native';
+import { View, FlatList, Alert, ScrollView, TouchableOpacity } from 'react-native';
 import { Text, FAB, Appbar, useTheme, IconButton, Surface, Avatar, Chip, Portal, Dialog, Button, Checkbox } from 'react-native-paper';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useState, useCallback, useMemo } from 'react';
@@ -136,62 +136,48 @@ export default function TeamDetails() {
               }}
               elevation={1}
             >
-              <View className="flex-row items-center p-2 pl-3">
-                {/* Number Badge */}
-                {item.number !== null && item.number !== undefined && ( 
-                  <View 
-                    style={{ 
-                      width: 36, 
-                      height: 36, 
-                      borderRadius: 18, 
-                      backgroundColor: theme.colors.secondaryContainer,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginRight: 10
-                    }}
-                  >
-                    <Text style={{ fontWeight: 'bold', color: theme.colors.onSecondaryContainer, fontSize: 14 }}>
-                      {item.number}
+              <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/teams/view-player', params: { playerId: item.id } })}>
+                <View className="flex-row items-center p-3">
+                  {/* Avatar/Initial (Optional replacement for number badge, or just text) */}
+                  {/* Let's keep it clean without number badge as requested */}
+
+                  {/* Info */}
+                  <View className="flex-1 mr-2">
+                    <Text variant="titleMedium" style={{ fontWeight: 'bold' }} numberOfLines={1}>
+                      {item.surname || item.name.split(' ')[0]}
+                    </Text>
+                    <Text variant="bodySmall" style={{ opacity: 0.7 }} numberOfLines={1} ellipsizeMode="tail">
+                      {item.name}
                     </Text>
                   </View>
-                )}
 
-                {/* Info */}
-                <View className="flex-1 mr-2">
-                  <Text variant="titleMedium" style={{ fontWeight: 'bold' }} numberOfLines={1}>
-                    {item.surname || item.name.split(' ')[0]}
-                  </Text>
-                  <Text variant="bodySmall" style={{ opacity: 0.7 }} numberOfLines={1} ellipsizeMode="tail">
-                    {item.name}
-                  </Text>
+                  {/* Actions Row - Compact */}
+                  <View className="flex-row items-center">
+                    <Chip 
+                      compact 
+                      mode="outlined" 
+                      style={{ marginRight: 8, height: 24, justifyContent: 'center' }} 
+                      textStyle={{ fontSize: 10, lineHeight: 10, marginVertical: 0, marginHorizontal: 6, textAlign: 'center' }}
+                    >
+                      {item.position}
+                    </Chip>
+                    
+                    <IconButton 
+                      icon="pencil" 
+                      size={20} 
+                      style={{ margin: 0, padding: 0 }}
+                      onPress={() => router.push({ pathname: '/(app)/teams/edit-player', params: { playerId: item.id } })} 
+                    />
+                    <IconButton 
+                      icon="delete" 
+                      size={20} 
+                      iconColor={theme.colors.error}
+                      style={{ margin: 0, padding: 0 }}
+                      onPress={() => handleDeletePlayer(item.id)} 
+                    />
+                  </View>
                 </View>
-
-                {/* Actions Row - Compact */}
-                <View className="flex-row items-center">
-                  <Chip 
-                    compact 
-                    mode="outlined" 
-                    style={{ marginRight: 12, height: 24, justifyContent: 'center' }} 
-                    textStyle={{ fontSize: 10, lineHeight: 10, marginVertical: 0, marginHorizontal: 6, textAlign: 'center' }}
-                  >
-                    {item.position}
-                  </Chip>
-                  
-                  <IconButton 
-                    icon="pencil" 
-                    size={20} 
-                    style={{ margin: 0, padding: 0 }}
-                    onPress={() => router.push({ pathname: '/(app)/teams/edit-player', params: { playerId: item.id } })} 
-                  />
-                  <IconButton 
-                    icon="delete" 
-                    size={20} 
-                    iconColor={theme.colors.error}
-                    style={{ margin: 0, padding: 0 }}
-                    onPress={() => handleDeletePlayer(item.id)} 
-                  />
-                </View>
-              </View>
+              </TouchableOpacity>
             </Surface>
           )}
         />
@@ -252,4 +238,3 @@ export default function TeamDetails() {
     </View>
   );
 }
-

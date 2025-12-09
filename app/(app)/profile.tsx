@@ -1,13 +1,16 @@
 import { View, Alert } from 'react-native';
-import { Text, Button, List, Switch, useTheme, Divider } from 'react-native-paper';
+import { Text, Button, List, Switch, useTheme, Divider, Card, Avatar, ActivityIndicator } from 'react-native-paper';
 import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/store/themeStore';
 import { syncService } from '../../src/services/syncService';
+import { useState } from 'react';
 
 export default function Profile() {
   const theme = useTheme();
   const router = useRouter();
   const { mode, setMode } = useThemeStore();
+  const [syncing, setSyncing] = useState(false);
 
   const isDarkMode = mode === 'dark';
 
@@ -16,42 +19,85 @@ export default function Profile() {
   };
 
   const handleSync = async () => {
+      setSyncing(true);
       try {
-        await syncService.uploadPending();
+        await syncService.syncAll();
         Alert.alert('Sucesso', 'Sincronização concluída!');
       } catch (e) {
         Alert.alert('Erro', 'Falha na sincronização. Verifique a conexão.');
+      } finally {
+        setSyncing(false);
       }
   };
 
   return (
     <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-      <View className="p-6 items-center">
-        <Text variant="headlineSmall" style={{ fontWeight: 'bold' }}>Usuário Exemplo</Text>
-        <Text variant="bodyMedium" style={{ opacity: 0.7 }}>Técnico</Text>
-      </View>
+      <SafeAreaView edges={['top']} className="flex-1">
+        
+        {/* HEADER */}
+        <View className="px-4 pt-4 pb-6">
+          <Text variant="displaySmall" style={{ fontWeight: 'bold', color: theme.colors.primary }}>
+            Configurações
+          </Text>
+          <Text variant="bodyMedium" style={{ opacity: 0.7 }}>
+            Gerencie suas preferências e dados
+          </Text>
+        </View>
 
-      <List.Section>
-        <List.Subheader>Configurações</List.Subheader>
-        <List.Item
-          title="Modo Escuro"
-          left={() => <List.Icon icon="theme-light-dark" />}
-          right={() => <Switch value={isDarkMode} onValueChange={toggleTheme} />}
-        />
-        <Divider />
-        <List.Item
-          title="Sincronizar Dados"
-          description="Enviar dados para a nuvem"
-          left={() => <List.Icon icon="cloud-sync" />}
-          onPress={handleSync}
-        />
-      </List.Section>
+        {/* USER CARD (Placeholder for now) */}
+        <View className="px-4 mb-6">
+            <Card mode="elevated" style={{ backgroundColor: theme.colors.surface }}>
+                <Card.Content style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Avatar.Icon size={50} icon="account" style={{ backgroundColor: theme.colors.primaryContainer }} />
+                    <View style={{ marginLeft: 16 }}>
+                        <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>Usuário Exemplo</Text>
+                        <Text variant="bodySmall">Técnico</Text>
+                    </View>
+                </Card.Content>
+            </Card>
+        </View>
 
-      <View className="p-4 mt-auto">
-        <Button mode="outlined" textColor={theme.colors.error} onPress={() => router.replace('/')}>
-          Sair
-        </Button>
-      </View>
+        {/* SETTINGS LIST */}
+        <View className="px-4">
+            <Text variant="titleMedium" style={{ marginBottom: 10, fontWeight: 'bold', opacity: 0.7 }}>Geral</Text>
+            
+            <Card mode="outlined" style={{ marginBottom: 12, backgroundColor: 'transparent', borderColor: theme.colors.outlineVariant }}>
+                <List.Item
+                    title="Modo Escuro"
+                    description="Alternar entre tema claro e escuro"
+                    left={props => <List.Icon {...props} icon="theme-light-dark" />}
+                    right={() => <Switch value={isDarkMode} onValueChange={toggleTheme} />}
+                />
+            </Card>
+
+            <Card mode="outlined" style={{ marginBottom: 12, backgroundColor: 'transparent', borderColor: theme.colors.outlineVariant }}>
+                <List.Item
+                    title="Sincronizar Dados"
+                    description={syncing ? "Sincronizando..." : "Enviar dados pendentes para a nuvem"}
+                    left={props => syncing 
+                        ? <ActivityIndicator style={{ marginLeft: 16, marginRight: 16 }} size="small" /> 
+                        : <List.Icon {...props} icon="cloud-sync" />
+                    }
+                    onPress={handleSync}
+                    disabled={syncing}
+                />
+            </Card>
+        </View>
+
+        {/* LOGOUT BUTTON */}
+        <View className="p-4 mt-auto">
+            <Button 
+                mode="contained-tonal" 
+                buttonColor={theme.colors.errorContainer}
+                textColor={theme.colors.onErrorContainer}
+                icon="logout"
+                onPress={() => router.replace('/')}
+            >
+            Sair
+            </Button>
+        </View>
+
+      </SafeAreaView>
     </View>
   );
 }

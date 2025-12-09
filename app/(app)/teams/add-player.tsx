@@ -29,8 +29,15 @@ export default function AddPlayer() {
   };
 
   const formatRG = (text: string) => {
-    // 00.000.000-0 (Generic Mask)
-    const v = text.replace(/\D/g, '').slice(0, 9);
+    const v = text.replace(/\D/g, '').slice(0, 11);
+    
+    if (v.length > 9) {
+      return v
+        .replace(/^(\d{3})(\d)/, '$1.$2')
+        .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+        .replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3-$4');
+    }
+
     if (v.length <= 2) return v;
     if (v.length <= 5) return `${v.slice(0, 2)}.${v.slice(2)}`;
     if (v.length <= 8) return `${v.slice(0, 2)}.${v.slice(2, 5)}.${v.slice(5)}`;
@@ -46,7 +53,7 @@ export default function AddPlayer() {
   };
 
   const handleSave = async () => {
-    if (!name.trim() || typeof teamId !== 'string') return; // Name is still required
+    if (!name.trim() || typeof teamId !== 'string') return;
     
     setSaving(true);
     try {
@@ -54,7 +61,7 @@ export default function AddPlayer() {
         teamId,
         name,
         surname: surname.trim() === '' ? null : surname,
-        number: number.trim() === '' ? null : parseInt(number), // Pass null if empty
+        number: number.trim() === '' ? null : parseInt(number),
         position,
         rg: rg.trim() === '' ? null : rg,
         cpf: cpf.trim() === '' ? null : cpf,
@@ -64,7 +71,6 @@ export default function AddPlayer() {
       router.back();
     } catch (e) {
       console.error(e);
-      // You might want to show an Alert to the user here
     } finally {
       setSaving(false);
     }
@@ -91,7 +97,7 @@ export default function AddPlayer() {
           mode="outlined"
         />
         <TextInput
-          label="Número da Camisa" // No asterisk
+          label="Número da Camisa"
           value={number}
           onChangeText={setNumber}
           mode="outlined"
@@ -160,7 +166,7 @@ export default function AddPlayer() {
           mode="contained" 
           onPress={handleSave} 
           loading={saving} 
-          disabled={!name.trim() || saving} // number is now optional
+          disabled={!name.trim() || saving}
           style={{ marginTop: 16, marginBottom: 32 }}
         >
           Salvar Jogador

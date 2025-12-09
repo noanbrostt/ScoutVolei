@@ -2,18 +2,16 @@ import { firestoreDb } from '../services/firebaseConfig';
 import { collection, doc, getDoc, setDoc, deleteDoc, query, where, getDocs, writeBatch, Timestamp } from 'firebase/firestore';
 import { db } from '../database/db';
 import { teams, players, matches, matchActions } from '../database/schemas';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc } from 'drizzle-orm';
 import * as Network from 'expo-network';
 
-console.log('syncService loaded. firestoreDb:', firestoreDb); // DEBUG LINE
+console.log('syncService loaded. firestoreDb:', firestoreDb);
 
-const SYNC_INTERVAL_MS = 10000; // Sync every 10 seconds
+const SYNC_INTERVAL_MS = 60000; // Sync every 1 minute
 
 // Helper to convert Drizzle schema to Firestore document (stripping local-only fields)
 const toFirestoreDoc = (item: any) => {
     const { syncStatus, deleted, ...rest } = item;
-    // Firestore Timestamps are preferred, but local DB stores ISO strings.
-    // For simplicity, we'll keep them as ISO strings for now to avoid conversion complexity.
     return rest;
 };
 
@@ -57,7 +55,6 @@ export const syncService = {
             console.log('Sync finished successfully.');
         } catch (error) {
             console.error('Error during sync:', error);
-            // Implement more sophisticated error handling (e.g., specific status for errors, retries)
         }
     },
 
@@ -87,13 +84,10 @@ export const syncService = {
                     console.log(`Deleted ${name} ${item.id} from Firestore and local DB.`);
                 } catch (error: any) {
                     console.error(`Failed to delete ${name} ${item.id} from Firestore:`, error);
-                    // If document not found in Firestore, it means it was already deleted or never existed.
-                    // In that case, we can proceed to delete locally to clean up.
                     if (error.code === 'not-found') {
                         await physicallyDeleteLocal(tx, table, item.id);
                         console.log(`Document ${name} ${item.id} not found in Firestore, physically deleted locally.`);
                     }
-                    // For other errors, keep as pending to retry
                 }
             }
         }
@@ -161,20 +155,62 @@ export const syncService = {
 
     /**
      * Syncs new/updated match actions to Firestore.
+     * LOGIC: Only sync actions from finished matches OR finished sets (setNumber < currentMaxSet).
      */
     syncMatchActions: async (tx: any) => {
         console.log('Syncing match actions...');
+        
+        // 1. Get all pending actions
         const actionsToSync = await tx.select().from(matchActions).where(and(eq(matchActions.syncStatus, 'pending'), eq(matchActions.deleted, false)));
-        if (actionsToSync.length > 0) console.log(`Found ${actionsToSync.length} match actions pending sync.`);
+        if (actionsToSync.length === 0) return;
 
-        for (const action of actionsToSync) {
-            try {
-                const docRef = doc(firestoreDb, 'matchActions', action.id);
-                await setDoc(docRef, toFirestoreDoc(action), { merge: true });
-                await markAsSynced(tx, matchActions, action.id);
-                console.log(`Synced match action ${action.id}`);
-            } catch (error) {
-                console.error(`Failed to sync match action ${action.id}:`, error);
+        console.log(`Found ${actionsToSync.length} match actions pending. Checking set status...`);
+
+        // 2. Group by Match ID
+        const actionsByMatch: Record<string, typeof actionsToSync> = {};
+        actionsToSync.forEach(action => {
+            if (!actionsByMatch[action.matchId]) actionsByMatch[action.matchId] = [];
+            actionsByMatch[action.matchId].push(action);
+        });
+
+        // 3. Process each match
+        for (const matchId of Object.keys(actionsByMatch)) {
+            const match = await tx.select().from(matches).where(eq(matches.id, matchId)).get();
+            
+            if (!match) continue;
+
+            let actionsToSend = [];
+
+            if (match.isFinished) {
+                actionsToSend = actionsByMatch[matchId];
+            } else {
+                // Determine current set
+                const result = await tx.select({ maxSet: matchActions.setNumber })
+                                       .from(matchActions)
+                                       .where(eq(matchActions.matchId, matchId))
+                                       .orderBy(desc(matchActions.setNumber))
+                                       .limit(1);
+                
+                const currentSet = result.length > 0 ? result[0].maxSet : 1;
+
+                // Only sync actions from PREVIOUS sets
+                actionsToSend = actionsByMatch[matchId].filter(a => a.setNumber < currentSet);
+            }
+
+            if (actionsToSend.length > 0) {
+                console.log(`Syncing ${actionsToSend.length} actions for match ${matchId} (Finished: ${match.isFinished})`);
+                
+                for (const action of actionsToSend) {
+                    try {
+                        const docRef = doc(firestoreDb, 'matchActions', action.id);
+                        await setDoc(docRef, toFirestoreDoc(action), { merge: true });
+                        await markAsSynced(tx, matchActions, action.id);
+                    } catch (error) {
+                        console.error(`Failed to sync match action ${action.id}:`, error);
+                    }
+                }
+            } else {
+                console.log(`Skipping ${actionsByMatch[matchId].length} pending actions for ongoing match ${matchId} (current set active).`);
             }
         }
     },
