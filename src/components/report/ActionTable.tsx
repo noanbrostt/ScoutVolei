@@ -67,13 +67,12 @@ export default function ActionTable({ data }: ActionTableProps) {
 
       <Portal>
         <Dialog visible={visible} onDismiss={() => setVisible(false)}>
-          <Dialog.Title>Detalhes</Dialog.Title>
           <Dialog.Content>
-            <Text variant="bodyMedium" style={{ marginBottom: 10 }}>
-              <Text style={{ fontWeight: 'bold', color: theme.colors.primary }}>Atk (Ataque):</Text> Ataque realizado após um Passe (Side-out).
-            </Text>
             <Text variant="bodyMedium">
-              <Text style={{ fontWeight: 'bold', color: theme.colors.primary }}>C. Atk (Contra-Ataque):</Text> Ataque realizado após uma Defesa.
+              <Text style={{ fontWeight: 'bold', color: theme.colors.primary }}>Atk (Ataque):</Text>{'\n'}
+              Ataque realizado após um Passe (Side-out).{'\n'}{'\n'}
+              <Text style={{ fontWeight: 'bold', color: theme.colors.primary }}>C. Atk (Contra-Ataque):</Text>{'\n'}
+              Ataque realizado após uma Defesa.
             </Text>
           </Dialog.Content>
           <Dialog.Actions>

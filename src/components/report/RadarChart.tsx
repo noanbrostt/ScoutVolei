@@ -148,13 +148,12 @@ export default function RadarChart({ data }: Props) {
 
       <Portal>
         <Dialog visible={visible} onDismiss={() => setVisible(false)}>
-          <Dialog.Title>Positividade</Dialog.Title>
           <Dialog.Content>
-            <Text variant="bodyMedium" style={{ marginBottom: 10 }}>
-              <Text style={{ fontWeight: 'bold' }}>Cálculo:</Text> (Ações Nota 3 + Ações Nota 2) ÷ Total de Ações.
-            </Text>
             <Text variant="bodyMedium">
-              <Text style={{ fontWeight: 'bold' }}>Nota:</Text> Se o fundamento estiver cinza, significa que não houve registros desse tipo.
+              <Text style={{ fontWeight: 'bold' }}>Cálculo:</Text>{'\n'}
+              (Ações Nota 3 + Ações Nota 2) ÷ Total de Ações.{'\n'}{'\n'}
+              <Text style={{ fontWeight: 'bold' }}>Eu errei ou não fiz essa ação?</Text>{'\n'}
+              Quando o fundamento fica cinza, significa que nenhuma ação desse tipo foi registrada (Ex: Para todo líbero o "Saque" ficará cinza).
             </Text>
           </Dialog.Content>
           <Dialog.Actions>

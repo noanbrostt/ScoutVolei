@@ -77,6 +77,27 @@ export default function MatchReportScreen() {
       return roster.filter(p => participatedPlayerIds.includes(p.id));
   }, [roster, participatedPlayerIds]);
 
+  // Calculate Set Score
+  const { setsUs, setsThem } = useMemo(() => {
+      let sUs = 0;
+      let sThem = 0;
+      
+      setsPlayed.forEach(setNum => {
+          const setActions = matchActions.filter(a => a.setNumber === setNum);
+          let scoreUs = 0;
+          let scoreThem = 0;
+          
+          setActions.forEach(a => {
+              if (a.scoreChange === 1) scoreUs++;
+              if (a.scoreChange === -1) scoreThem++;
+          });
+
+          if (scoreUs > scoreThem) sUs++;
+          else if (scoreThem > scoreUs) sThem++;
+      });
+      return { setsUs: sUs, setsThem: sThem };
+  }, [matchActions, setsPlayed]);
+
   // Filter Actions
   const filteredActions = useMemo(() => {
       return matchActions.filter(a => {
@@ -234,7 +255,7 @@ export default function MatchReportScreen() {
             <View className="items-center">
                 <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>Relatório</Text>
                 <Text variant="bodySmall" style={{ color: theme.colors.secondary }}>
-                    {match?.teamName || 'Meu Time'} x {match?.opponentName}
+                    {match?.teamName || 'Meu Time'} <Text style={{ fontWeight: 'bold', color: theme.colors.primary }}>{setsUs}</Text> x <Text style={{ fontWeight: 'bold', color: theme.colors.error }}>{setsThem}</Text> {match?.opponentName}
                 </Text>
             </View>
             {/* Export Button */}

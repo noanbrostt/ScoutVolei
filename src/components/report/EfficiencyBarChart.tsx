@@ -168,13 +168,12 @@ export default function EfficiencyBarChart({ data, barColors }: Props) {
 
       <Portal>
         <Dialog visible={visible} onDismiss={() => setVisible(false)}>
-          <Dialog.Title>Eficiência</Dialog.Title>
           <Dialog.Content>
-            <Text variant="bodyMedium" style={{ marginBottom: 10 }}>
-              <Text style={{ fontWeight: 'bold' }}>Cálculo:</Text> (Nota 3 + Nota 2 - Nota 1 - Nota 0) ÷ Total.
-            </Text>
             <Text variant="bodyMedium">
-              Barras <Text style={{ color: positive, fontWeight: 'bold' }}>Verdes</Text> são positivas, <Text style={{ color: negative, fontWeight: 'bold' }}>Vermelhas</Text> negativas.
+              <Text style={{ fontWeight: 'bold' }}>Cálculo:</Text>{'\n'}
+              (Nota 3 + Nota 2 - Nota 1 - Nota 0) ÷ Total.{'\n'}{'\n'}
+              <Text style={{ fontWeight: 'bold' }}>Eu errei ou não fiz essa ação?</Text>{'\n'}
+              Quando o fundamento fica cinza, significa que nenhuma ação desse tipo foi registrada (Ex: Para todo líbero o "Saque" ficará cinza).
             </Text>
           </Dialog.Content>
           <Dialog.Actions>
