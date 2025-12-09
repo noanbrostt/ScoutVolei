@@ -269,7 +269,7 @@ export default function MatchReportScreen() {
                     <EfficiencyBarChart data={barData} />
                     <ActionTable data={tableData} />
                     <Divider style={{ marginVertical: 20, marginHorizontal: 16 }} />
-                    <Text variant="headlineSmall" style={{ textAlign: 'center', marginBottom: 20 }}>Distribuição de Qualidade</Text>
+                    <Text variant="titleMedium" style={{ fontWeight: 'bold', color: theme.colors.onSurface, textAlign: 'center', marginBottom: 20 }}>Distribuição de Qualidade</Text>
                     <View style={styles.piesGrid}>
                         <SplitPieChart counts={scoringCounts} title="Total Scoring Skills" />
                         <SplitPieChart counts={nonScoringCounts} title="Total Non-Scoring Skills" />
