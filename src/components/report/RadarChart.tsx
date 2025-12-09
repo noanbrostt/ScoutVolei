@@ -149,15 +149,16 @@ export default function RadarChart({ data }: Props) {
       <Portal>
         <Dialog visible={visible} onDismiss={() => setVisible(false)}>
           <Dialog.Content>
-            <Text variant="bodyMedium">
-              <Text style={{ fontWeight: 'bold' }}>Cálculo:</Text>{'\n'}
-              (Ações Nota 3 + Ações Nota 2) ÷ Total de Ações.{'\n'}{'\n'}
-              <Text style={{ fontWeight: 'bold' }}>Eu errei ou não fiz essa ação?</Text>{'\n'}
-              Quando o fundamento fica cinza, significa que nenhuma ação desse tipo foi registrada (Ex: Para todo líbero o "Saque" ficará cinza).
-            </Text>
+            <View style={{ alignItems: 'center' }}>
+              <Text variant="bodyMedium" style={{ fontWeight: '900', textAlign: 'center', fontSize: 16, marginBottom: 4 }}>Cálculo</Text>
+              <Text variant="bodyMedium" style={{ textAlign: 'center' }}>(Ações Nota 3 + Ações Nota 2) ÷ Total de Ações.</Text>
+              <Text>{'\n'}</Text>
+              <Text variant="bodyMedium" style={{ fontWeight: '900', textAlign: 'center', fontSize: 16, marginBottom: 4 }}>Eu errei ou não fiz essa ação?</Text>
+              <Text variant="bodyMedium" style={{ textAlign: 'center' }}>Quando o fundamento fica cinza, significa que nenhuma ação desse tipo foi registrada (Ex: Para todo líbero o "Saque" ficará cinza).</Text>
+            </View>
           </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setVisible(false)}>Entendi</Button>
+          <Dialog.Actions style={{ justifyContent: 'center' }}>
+            <Button mode="contained" buttonColor={theme.colors.primary} textColor="white" style={{ borderRadius: 4 }} contentStyle={{ paddingVertical: 2 }} onPress={() => setVisible(false)}>Entendi</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>

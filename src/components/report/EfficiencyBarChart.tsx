@@ -169,15 +169,16 @@ export default function EfficiencyBarChart({ data, barColors }: Props) {
       <Portal>
         <Dialog visible={visible} onDismiss={() => setVisible(false)}>
           <Dialog.Content>
-            <Text variant="bodyMedium">
-              <Text style={{ fontWeight: 'bold' }}>Cálculo:</Text>{'\n'}
-              (Nota 3 + Nota 2 - Nota 1 - Nota 0) ÷ Total.{'\n'}{'\n'}
-              <Text style={{ fontWeight: 'bold' }}>Eu errei ou não fiz essa ação?</Text>{'\n'}
-              Quando o fundamento fica cinza, significa que nenhuma ação desse tipo foi registrada (Ex: Para todo líbero o "Saque" ficará cinza).
-            </Text>
+            <View style={{ alignItems: 'center' }}>
+              <Text variant="bodyMedium" style={{ fontWeight: '900', textAlign: 'center', fontSize: 16, marginBottom: 4 }}>Cálculo</Text>
+              <Text variant="bodyMedium" style={{ textAlign: 'center' }}>(Nota 3 + Nota 2 - Nota 1 - Nota 0) ÷ Total.</Text>
+              <Text>{'\n'}</Text>
+              <Text variant="bodyMedium" style={{ fontWeight: '900', textAlign: 'center', fontSize: 16, marginBottom: 4 }}>Eu errei ou não fiz essa ação?</Text>
+              <Text variant="bodyMedium" style={{ textAlign: 'center' }}>Quando o fundamento fica cinza, significa que nenhuma ação desse tipo foi registrada (Ex: Para todo líbero o "Saque" ficará cinza).</Text>
+            </View>
           </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setVisible(false)}>Entendi</Button>
+          <Dialog.Actions style={{ justifyContent: 'center' }}>
+            <Button mode="contained" buttonColor={theme.colors.primary} textColor="white" style={{ borderRadius: 4 }} contentStyle={{ paddingVertical: 2 }} onPress={() => setVisible(false)}>Entendi</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>

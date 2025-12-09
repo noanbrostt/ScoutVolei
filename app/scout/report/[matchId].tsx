@@ -174,61 +174,202 @@ export default function MatchReportScreen() {
   }, [matchActions, selectedSet, selectedPlayerId]);
 
 
-  // Table Data
-  const tableData = useMemo(() => {
-      const header = ['', ...qualities.map(String), 'Total'];
-      const rows = [];
+    // Table Data
 
-      fundamentals.forEach(fund => {
-          const acts = filteredActions.filter(a => a.actionType === fund);
-          const total = acts.length;
-          const row = [
-              fund === 'Levantamento' ? 'Levant.' : (fund === 'Bloqueio' ? 'Bloq.' : fund),
-              ...qualities.map(q => {
-                  const count = acts.filter(a => a.quality === q).length;
-                  const pct = total > 0 ? ((count / total) * 100).toFixed(1) + '%' : '0%';
-                  return (
-                      <View style={{ alignItems: 'center' }}>
-                          <Text style={{ fontSize: 14, color: theme.colors.onSurface }}>{count}</Text>
-                          <Text style={{ fontSize: 10, color: theme.colors.outline }}>{pct}</Text>
-                      </View>
-                  );
-              }),
-              <Text style={{ fontWeight: 'bold', color: theme.colors.onSurface }}>{total}</Text>
-          ];
-          rows.push(row);
-      });
 
-      const addSpecialRow = (label: string, data: any[]) => {
-          const total = data.length;
-          return [
-              <Text style={{ fontWeight: 'bold', color: theme.colors.primary }}>{label}</Text>,
-              ...qualities.map(q => {
-                  const count = data.filter(a => a.quality === q).length;
-                  const pct = total > 0 ? ((count / total) * 100).toFixed(1) + '%' : '0%';
-                  return (
-                      <View style={{ alignItems: 'center' }}>
-                          <Text style={{ fontSize: 14, color: theme.colors.onSurface }}>{count}</Text>
-                          <Text style={{ fontSize: 10, color: theme.colors.outline }}>{pct}</Text>
-                      </View>
-                  );
-              }),
-              <Text style={{ fontWeight: 'bold', color: theme.colors.onSurface }}>{total}</Text>
-          ];
-      };
+    const tableData = useMemo(() => {
 
-      rows.push(addSpecialRow('Atk.', sideOutAttacks));
-      rows.push(addSpecialRow('C. Atk.', counterAttacks));
 
-      return {
-          header,
-          data: rows,
-          opponent: {
-              errosAdversario: filteredActions.filter(a => a.actionType === 'Erro Adversário').length,
-              pontosAdversario: filteredActions.filter(a => a.actionType === 'Ponto Adversário').length,
-          }
-      };
-  }, [filteredActions, sideOutAttacks, counterAttacks, theme]);
+        const header = ['', ...qualities.map(String), 'Total'];
+
+
+        const rows = [];
+
+
+  
+
+
+        // Fundamentals Rows
+
+
+        fundamentals.forEach(fund => {
+
+
+            const acts = filteredActions.filter(a => a.actionType === fund);
+
+
+            const total = acts.length;
+
+
+            const isEmpty = total === 0;
+
+
+            const baseColor = isEmpty ? theme.colors.outline : theme.colors.onSurface;
+
+
+  
+
+
+            const row = [
+
+
+                <Text style={{ fontWeight: 'bold', color: baseColor }}>
+
+
+                    {fund === 'Levantamento' ? 'Levant.' : (fund === 'Bloqueio' ? 'Bloq.' : fund)}
+
+
+                </Text>,
+
+
+                ...qualities.map(q => {
+
+
+                    const count = acts.filter(a => a.quality === q).length;
+
+
+                    const pct = total > 0 ? ((count / total) * 100).toFixed(1) + '%' : '0%';
+
+
+                    return (
+
+
+                        <View style={{ alignItems: 'center' }}>
+
+
+                            <Text style={{ fontSize: 14, color: baseColor }}>{count}</Text>
+
+
+                            <Text style={{ fontSize: 10, color: theme.colors.outline }}>{pct}</Text>
+
+
+                        </View>
+
+
+                    );
+
+
+                }),
+
+
+                <Text style={{ fontWeight: 'bold', color: baseColor }}>{total}</Text>
+
+
+            ];
+
+
+            rows.push(row);
+
+
+        });
+
+
+  
+
+
+        // Special Rows
+
+
+        const addSpecialRow = (label: string, data: any[]) => {
+
+
+            const total = data.length;
+
+
+            const isEmpty = total === 0;
+
+
+            const labelColor = isEmpty ? theme.colors.outline : theme.colors.primary;
+
+
+            const valueColor = isEmpty ? theme.colors.outline : theme.colors.onSurface;
+
+
+  
+
+
+            return [
+
+
+                <Text style={{ fontWeight: 'bold', color: labelColor }}>{label}</Text>,
+
+
+                ...qualities.map(q => {
+
+
+                    const count = data.filter(a => a.quality === q).length;
+
+
+                    const pct = total > 0 ? ((count / total) * 100).toFixed(1) + '%' : '0%';
+
+
+                    return (
+
+
+                        <View style={{ alignItems: 'center' }}>
+
+
+                            <Text style={{ fontSize: 14, color: valueColor }}>{count}</Text>
+
+
+                            <Text style={{ fontSize: 10, color: theme.colors.outline }}>{pct}</Text>
+
+
+                        </View>
+
+
+                    );
+
+
+                }),
+
+
+                <Text style={{ fontWeight: 'bold', color: valueColor }}>{total}</Text>
+
+
+            ];
+
+
+        };
+
+
+  
+
+
+        rows.push(addSpecialRow('Atk.', sideOutAttacks));
+
+
+        rows.push(addSpecialRow('C. Atk.', counterAttacks));
+
+
+  
+
+
+        return {
+
+
+            header,
+
+
+            data: rows,
+
+
+            opponent: {
+
+
+                errosAdversario: filteredActions.filter(a => a.actionType === 'Erro Adversário').length,
+
+
+                pontosAdversario: filteredActions.filter(a => a.actionType === 'Ponto Adversário').length,
+
+
+            }
+
+
+        };
+
+
+    }, [filteredActions, sideOutAttacks, counterAttacks, theme]);
 
   const selectedPlayerName = selectedPlayerId 
       ? (roster.find(p => p.id === selectedPlayerId)?.surname || roster.find(p => p.id === selectedPlayerId)?.name || 'Jogador')
@@ -331,7 +472,7 @@ export default function MatchReportScreen() {
                           {participatedPlayers.map(p => (
                               <RadioButton.Item 
                                 key={p.id} 
-                                label={`${(p.surname || p.name).toUpperCase()} (#${p.number})`} 
+                                label={(p.surname || p.name).toUpperCase()} 
                                 value={p.id} 
                               />
                           ))}

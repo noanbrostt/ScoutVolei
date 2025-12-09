@@ -58,7 +58,7 @@ export default function ActionTable({ data }: ActionTableProps) {
 
       <View style={styles.opponentStats}>
           <Text variant="bodySmall" style={{ color: theme.colors.onSurface }}>
-              Ponto Nosso (Erro Deles): <Text style={{fontWeight:'bold', color: theme.colors.primary}}>{data.opponent.errosAdversario}</Text>
+              Erro Deles: <Text style={{fontWeight:'bold', color: theme.colors.primary}}>{data.opponent.errosAdversario}</Text>
           </Text>
           <Text variant="bodySmall" style={{ color: theme.colors.onSurface }}>
               Ponto Deles: <Text style={{fontWeight:'bold', color: theme.colors.error}}>{data.opponent.pontosAdversario}</Text>
@@ -67,16 +67,18 @@ export default function ActionTable({ data }: ActionTableProps) {
 
       <Portal>
         <Dialog visible={visible} onDismiss={() => setVisible(false)}>
+          <Dialog.Title>Detalhes</Dialog.Title>
           <Dialog.Content>
-            <Text variant="bodyMedium">
-              <Text style={{ fontWeight: 'bold', color: theme.colors.primary }}>Atk (Ataque):</Text>{'\n'}
-              Ataque realizado após um Passe (Side-out).{'\n'}{'\n'}
-              <Text style={{ fontWeight: 'bold', color: theme.colors.primary }}>C. Atk (Contra-Ataque):</Text>{'\n'}
-              Ataque realizado após uma Defesa.
-            </Text>
+            <View style={{ alignItems: 'center' }}>
+              <Text variant="bodyMedium" style={{ fontWeight: '900', color: theme.colors.primary, textAlign: 'center', fontSize: 16, marginBottom: 4 }}>Atk (Ataque)</Text>
+              <Text variant="bodyMedium" style={{ textAlign: 'center' }}>Ataque realizado após um Passe (Side-out).</Text>
+              <Text>{'\n'}</Text>
+              <Text variant="bodyMedium" style={{ fontWeight: '900', color: theme.colors.primary, textAlign: 'center', fontSize: 16, marginBottom: 4 }}>C. Atk (Contra-Ataque)</Text>
+              <Text variant="bodyMedium" style={{ textAlign: 'center' }}>Ataque realizado após uma Defesa.</Text>
+            </View>
           </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setVisible(false)}>Entendi</Button>
+          <Dialog.Actions style={{ justifyContent: 'center' }}>
+            <Button mode="contained" buttonColor={theme.colors.primary} textColor="white" style={{ borderRadius: 4 }} contentStyle={{ paddingVertical: 2 }} onPress={() => setVisible(false)}>Entendi</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
