@@ -18,7 +18,10 @@
     "newArchEnabled": true,
     "extra": {
       "router": {},
-      "eas": {}
-    }
+      "eas": {
+        "projectId": "cd403c02-f602-4003-b272-994b329b8696"
+      }
+    },
+    "owner": "noanbrostt"
   }
 }
