@@ -1,9 +1,10 @@
-import { View, ScrollView, Modal, TouchableOpacity } from 'react-native';
+import { View, ScrollView, Modal, TouchableOpacity, Alert } from 'react-native';
 import { Text, useTheme, Chip, Button, Portal, Dialog, RadioButton, Divider, ActivityIndicator, IconButton } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState, useMemo } from 'react';
 import { matchService } from '../../../src/services/matchService';
 import { playerService } from '../../../src/services/playerService';
+import { generateMatchPDF } from '../../../src/services/pdfGenerator';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RadarChart from '../../../src/components/report/RadarChart';
 import EfficiencyBarChart from '../../../src/components/report/EfficiencyBarChart';
@@ -15,6 +16,7 @@ export default function MatchReportScreen() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const [match, setMatch] = useState<any>(null);
   const [matchActions, setMatchActions] = useState<any[]>([]);
   const [roster, setRoster] = useState<any[]>([]);
@@ -42,9 +44,22 @@ export default function MatchReportScreen() {
       const teamPlayers = await playerService.getByTeamId(m.teamId);
       
       setMatch(m);
-      setMatchActions(acts); // These come in DESC order usually from service, check service.
+      setMatchActions(acts);
       setRoster(teamPlayers);
       setLoading(false);
+  };
+
+  const handleExportPDF = async () => {
+      if (!match || matchActions.length === 0) return;
+      setExporting(true);
+      try {
+          await generateMatchPDF(match, matchActions, roster);
+      } catch (error) {
+          console.error("Error generating PDF:", error);
+          Alert.alert("Erro", "Falha ao gerar PDF. Verifique se há dados suficientes.");
+      } finally {
+          setExporting(false);
+      }
   };
 
   // Derived Data
@@ -110,36 +125,24 @@ export default function MatchReportScreen() {
   }, [filteredActions]);
 
   // Side-out (Atk) vs Counter-Attack (C. Atk) Logic
-  // Need chronological order for sequence analysis
   const { sideOutAttacks, counterAttacks } = useMemo(() => {
-      // Filter actions for the selected set (sequence logic needs the whole flow of the set, but filtering by player breaks flow? 
-      // Actually, sequence detection should run on TEAM actions for the SET, then filter results by Player if needed.)
-      // BUT: If "selectedPlayer" is set, we only want THAT player's Attacks.
-      
       const chronologicalActions = [...matchActions].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
       
       const sOut: any[] = [];
       const cAtk: any[] = [];
 
-      // Logic: Iterate actions. If we find an ATTACK, look back at previous actions in the SAME SET.
       chronologicalActions.forEach((act, index) => {
           if (act.actionType !== 'Ataque') return;
           
-          // Filters check: 
           if (selectedSet !== null && act.setNumber !== selectedSet) return;
           if (selectedPlayerId !== null && act.playerId !== selectedPlayerId) return;
 
-          // Look back
-          // We need to find the "Sequence Starter" (Passe or Defesa)
-          // Simple heuristic: Look at the last 2-3 actions.
           let prev1 = index > 0 ? chronologicalActions[index - 1] : null;
           let prev2 = index > 1 ? chronologicalActions[index - 2] : null;
 
-          // Check direct sequence: Passe -> Ataque
           if (prev1 && prev1.actionType === 'Passe') { sOut.push(act); return; }
           if (prev1 && prev1.actionType === 'Defesa') { cAtk.push(act); return; }
 
-          // Check sequence with Set: Passe -> Lev -> Ataque
           if (prev1 && prev1.actionType === 'Levantamento') {
               if (prev2 && prev2.actionType === 'Passe') { sOut.push(act); return; }
               if (prev2 && prev2.actionType === 'Defesa') { cAtk.push(act); return; }
@@ -155,7 +158,6 @@ export default function MatchReportScreen() {
       const header = ['', ...qualities.map(String), 'Total'];
       const rows = [];
 
-      // Fundamentals Rows
       fundamentals.forEach(fund => {
           const acts = filteredActions.filter(a => a.actionType === fund);
           const total = acts.length;
@@ -176,7 +178,6 @@ export default function MatchReportScreen() {
           rows.push(row);
       });
 
-      // Special Rows
       const addSpecialRow = (label: string, data: any[]) => {
           const total = data.length;
           return [
@@ -208,7 +209,6 @@ export default function MatchReportScreen() {
       };
   }, [filteredActions, sideOutAttacks, counterAttacks, theme]);
 
-  // Get currently selected player name
   const selectedPlayerName = selectedPlayerId 
       ? (roster.find(p => p.id === selectedPlayerId)?.surname || roster.find(p => p.id === selectedPlayerId)?.name || 'Jogador')
       : 'Time Todo';
@@ -237,7 +237,12 @@ export default function MatchReportScreen() {
                     {match?.teamName || 'Meu Time'} x {match?.opponentName}
                 </Text>
             </View>
-            <View style={{ width: 40 }} /> 
+            {/* Export Button */}
+            {exporting ? (
+                 <ActivityIndicator size="small" style={{ width: 40 }} />
+            ) : (
+                 <IconButton icon="share-variant" onPress={handleExportPDF} />
+            )}
         </View>
 
         {/* FILTERS SECTION */}
@@ -255,7 +260,7 @@ export default function MatchReportScreen() {
                 {selectedPlayerName.toUpperCase()}
             </Button>
 
-            {/* Set Filter Button (Similar Style) */}
+            {/* Set Filter Button */}
             <Button 
                 mode="outlined" 
                 onPress={() => setSetModalVisible(true)}
