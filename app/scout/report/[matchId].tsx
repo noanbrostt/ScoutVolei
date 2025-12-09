@@ -1,16 +1,347 @@
-import { View } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
-import { useLocalSearchParams } from 'expo-router';
+import { View, ScrollView, Modal, TouchableOpacity } from 'react-native';
+import { Text, useTheme, Chip, Button, Portal, Dialog, RadioButton, Divider, ActivityIndicator, IconButton } from 'react-native-paper';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState, useMemo } from 'react';
+import { matchService } from '../../../src/services/matchService';
+import { playerService } from '../../../src/services/playerService';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import RadarChart from '../../../src/components/report/RadarChart';
+import EfficiencyBarChart from '../../../src/components/report/EfficiencyBarChart';
+import ActionTable from '../../../src/components/report/ActionTable';
 
 export default function MatchReportScreen() {
   const { matchId } = useLocalSearchParams();
   const theme = useTheme();
+  const router = useRouter();
+
+  const [loading, setLoading] = useState(true);
+  const [match, setMatch] = useState<any>(null);
+  const [matchActions, setMatchActions] = useState<any[]>([]);
+  const [roster, setRoster] = useState<any[]>([]);
+  
+  // Filters
+  const [selectedSet, setSelectedSet] = useState<number | null>(null); // null = All Sets
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null); // null = All Players
+  
+  // Modals
+  const [playerModalVisible, setPlayerModalVisible] = useState(false);
+  const [setModalVisible, setSetModalVisible] = useState(false);
+
+  useEffect(() => {
+    if (typeof matchId === 'string') {
+        loadData(matchId);
+    }
+  }, [matchId]);
+
+  const loadData = async (id: string) => {
+      setLoading(true);
+      const m = await matchService.getById(id);
+      const acts = await matchService.getActions(id);
+      
+      // Get Roster
+      const teamPlayers = await playerService.getByTeamId(m.teamId);
+      
+      setMatch(m);
+      setMatchActions(acts); // These come in DESC order usually from service, check service.
+      setRoster(teamPlayers);
+      setLoading(false);
+  };
+
+  // Derived Data
+  const setsPlayed = useMemo(() => {
+      return matchActions.length > 0 
+      ? Array.from(new Set(matchActions.map(a => a.setNumber))).sort((a, b) => a - b)
+      : [];
+  }, [matchActions]);
+
+  const participatedPlayerIds = useMemo(() => {
+     return Array.from(new Set(matchActions.map(a => a.playerId).filter(id => id !== null)));
+  }, [matchActions]);
+  
+  const participatedPlayers = useMemo(() => {
+      return roster.filter(p => participatedPlayerIds.includes(p.id));
+  }, [roster, participatedPlayerIds]);
+
+  // Filter Actions
+  const filteredActions = useMemo(() => {
+      return matchActions.filter(a => {
+          if (selectedSet !== null && a.setNumber !== selectedSet) return false;
+          if (selectedPlayerId !== null && a.playerId !== selectedPlayerId) return false;
+          return true;
+      });
+  }, [matchActions, selectedSet, selectedPlayerId]);
+
+  // --- STATS CALCULATION ---
+  const fundamentals = ['Passe', 'Defesa', 'Bloqueio', 'Ataque', 'Saque', 'Levantamento'];
+  const qualities = [3, 2, 1, 0];
+
+  // Radar Data (Positivity)
+  const radarData = useMemo(() => {
+      const data: Record<string, number> = {};
+      fundamentals.forEach(fund => {
+          const acts = filteredActions.filter(a => a.actionType === fund);
+          if (acts.length === 0) {
+              data[fund] = 0.04141; // Placeholder for gray text in chart
+          } else {
+              const positiveCount = acts.filter(a => a.quality >= 2).length;
+              data[fund] = positiveCount / acts.length;
+          }
+      });
+      return data;
+  }, [filteredActions]);
+
+  // Bar Data (Efficiency Distribution)
+  const barData = useMemo(() => {
+      const data: Record<string, {0:number, 1:number, 2:number, 3:number}> = {};
+      fundamentals.forEach(fund => {
+          const acts = filteredActions.filter(a => a.actionType === fund);
+          if (acts.length === 0) {
+              data[fund] = {0:0, 1:0, 2:0, 3:0}; // Chart handles empty check via logic
+          } else {
+             data[fund] = {
+                 0: acts.filter(a => a.quality === 0).length,
+                 1: acts.filter(a => a.quality === 1).length,
+                 2: acts.filter(a => a.quality === 2).length,
+                 3: acts.filter(a => a.quality === 3).length,
+             };
+          }
+      });
+      return data;
+  }, [filteredActions]);
+
+  // Side-out (Atk) vs Counter-Attack (C. Atk) Logic
+  // Need chronological order for sequence analysis
+  const { sideOutAttacks, counterAttacks } = useMemo(() => {
+      // Filter actions for the selected set (sequence logic needs the whole flow of the set, but filtering by player breaks flow? 
+      // Actually, sequence detection should run on TEAM actions for the SET, then filter results by Player if needed.)
+      // BUT: If "selectedPlayer" is set, we only want THAT player's Attacks.
+      
+      const chronologicalActions = [...matchActions].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      
+      const sOut: any[] = [];
+      const cAtk: any[] = [];
+
+      // Logic: Iterate actions. If we find an ATTACK, look back at previous actions in the SAME SET.
+      chronologicalActions.forEach((act, index) => {
+          if (act.actionType !== 'Ataque') return;
+          
+          // Filters check: 
+          if (selectedSet !== null && act.setNumber !== selectedSet) return;
+          if (selectedPlayerId !== null && act.playerId !== selectedPlayerId) return;
+
+          // Look back
+          // We need to find the "Sequence Starter" (Passe or Defesa)
+          // Simple heuristic: Look at the last 2-3 actions.
+          let prev1 = index > 0 ? chronologicalActions[index - 1] : null;
+          let prev2 = index > 1 ? chronologicalActions[index - 2] : null;
+
+          // Check direct sequence: Passe -> Ataque
+          if (prev1 && prev1.actionType === 'Passe') { sOut.push(act); return; }
+          if (prev1 && prev1.actionType === 'Defesa') { cAtk.push(act); return; }
+
+          // Check sequence with Set: Passe -> Lev -> Ataque
+          if (prev1 && prev1.actionType === 'Levantamento') {
+              if (prev2 && prev2.actionType === 'Passe') { sOut.push(act); return; }
+              if (prev2 && prev2.actionType === 'Defesa') { cAtk.push(act); return; }
+          }
+      });
+
+      return { sideOutAttacks: sOut, counterAttacks: cAtk };
+  }, [matchActions, selectedSet, selectedPlayerId]);
+
+
+  // Table Data
+  const tableData = useMemo(() => {
+      const header = ['', ...qualities.map(String), 'Total'];
+      const rows = [];
+
+      // Fundamentals Rows
+      fundamentals.forEach(fund => {
+          const acts = filteredActions.filter(a => a.actionType === fund);
+          const total = acts.length;
+          const row = [
+              fund === 'Levantamento' ? 'Levant.' : (fund === 'Bloqueio' ? 'Bloq.' : fund),
+              ...qualities.map(q => {
+                  const count = acts.filter(a => a.quality === q).length;
+                  const pct = total > 0 ? ((count / total) * 100).toFixed(1) + '%' : '0%';
+                  return (
+                      <View style={{ alignItems: 'center' }}>
+                          <Text style={{ fontSize: 14, color: theme.colors.onSurface }}>{count}</Text>
+                          <Text style={{ fontSize: 10, color: theme.colors.outline }}>{pct}</Text>
+                      </View>
+                  );
+              }),
+              <Text style={{ fontWeight: 'bold', color: theme.colors.onSurface }}>{total}</Text>
+          ];
+          rows.push(row);
+      });
+
+      // Special Rows
+      const addSpecialRow = (label: string, data: any[]) => {
+          const total = data.length;
+          return [
+              <Text style={{ fontWeight: 'bold', color: theme.colors.primary }}>{label}</Text>,
+              ...qualities.map(q => {
+                  const count = data.filter(a => a.quality === q).length;
+                  const pct = total > 0 ? ((count / total) * 100).toFixed(1) + '%' : '0%';
+                  return (
+                      <View style={{ alignItems: 'center' }}>
+                          <Text style={{ fontSize: 14, color: theme.colors.onSurface }}>{count}</Text>
+                          <Text style={{ fontSize: 10, color: theme.colors.outline }}>{pct}</Text>
+                      </View>
+                  );
+              }),
+              <Text style={{ fontWeight: 'bold', color: theme.colors.onSurface }}>{total}</Text>
+          ];
+      };
+
+      rows.push(addSpecialRow('Atk.', sideOutAttacks));
+      rows.push(addSpecialRow('C. Atk.', counterAttacks));
+
+      return {
+          header,
+          data: rows,
+          opponent: {
+              errosAdversario: filteredActions.filter(a => a.actionType === 'Erro Adversário').length,
+              pontosAdversario: filteredActions.filter(a => a.actionType === 'Ponto Adversário').length,
+          }
+      };
+  }, [filteredActions, sideOutAttacks, counterAttacks, theme]);
+
+  // Get currently selected player name
+  const selectedPlayerName = selectedPlayerId 
+      ? (roster.find(p => p.id === selectedPlayerId)?.surname || roster.find(p => p.id === selectedPlayerId)?.name || 'Jogador')
+      : 'Time Todo';
+
+  const selectedSetName = selectedSet ? `${selectedSet}º SET` : 'JOGO TODO';
+
+  if (loading) {
+      return (
+          <View className="flex-1 justify-center items-center" style={{ backgroundColor: theme.colors.background }}>
+              <ActivityIndicator size="large" />
+              <Text style={{ marginTop: 10 }}>Carregando relatório...</Text>
+          </View>
+      );
+  }
 
   return (
-    <View className="flex-1 justify-center items-center" style={{ backgroundColor: theme.colors.background }}>
-      <Text variant="headlineMedium">Relatório da Partida</Text>
-      <Text>{matchId}</Text>
-      <Text>Em breve...</Text>
+    <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
+      <SafeAreaView edges={['top']} className="flex-1">
+        
+        {/* HEADER */}
+        <View className="px-4 py-2 flex-row items-center justify-between border-b border-gray-200 dark:border-gray-800">
+            <IconButton icon="arrow-left" onPress={() => router.back()} />
+            <View className="items-center">
+                <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>Relatório</Text>
+                <Text variant="bodySmall" style={{ color: theme.colors.secondary }}>
+                    {match?.teamName || 'Meu Time'} x {match?.opponentName}
+                </Text>
+            </View>
+            <View style={{ width: 40 }} /> 
+        </View>
+
+        {/* FILTERS SECTION */}
+        <View className="p-2 gap-2 flex-row justify-center bg-transparent">
+            
+            {/* Player Filter Button */}
+            <Button 
+                mode="outlined" 
+                icon={selectedPlayerId ? "account" : "account-group"}
+                onPress={() => setPlayerModalVisible(true)}
+                style={{ borderColor: theme.colors.outline, flex: 1 }}
+                textColor={theme.colors.onSurface}
+                contentStyle={{ flexDirection: 'row-reverse' }}
+            >
+                {selectedPlayerName.toUpperCase()}
+            </Button>
+
+            {/* Set Filter Button (Similar Style) */}
+            <Button 
+                mode="outlined" 
+                onPress={() => setSetModalVisible(true)}
+                style={{ borderColor: theme.colors.outline, flex: 1 }}
+                textColor={theme.colors.onSurface}
+            >
+                {selectedSetName}
+            </Button>
+        </View>
+
+        <Divider />
+
+        {/* CONTENT AREA */}
+        <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 40 }}>
+             {filteredActions.length > 0 ? (
+                 <>
+                    <RadarChart data={radarData} />
+                    <EfficiencyBarChart 
+                        data={barData}
+                        barColors={{
+                            positive: '#4CAF50',
+                            negative: '#F44336',
+                            neutral: '#BDBDBD',
+                            empty: theme.dark ? '#444' : '#ddd'
+                        }}
+                    />
+                    <ActionTable data={tableData} />
+                 </>
+             ) : (
+                 <Text style={{ textAlign: 'center', opacity: 0.5, marginTop: 40 }}>
+                     Nenhuma ação encontrada para os filtros selecionados.
+                 </Text>
+             )}
+        </ScrollView>
+
+      </SafeAreaView>
+
+      {/* PLAYER SELECTION MODAL */}
+      <Portal>
+          <Dialog visible={playerModalVisible} onDismiss={() => setPlayerModalVisible(false)} style={{ maxHeight: '80%' }}>
+              <Dialog.Title>Filtrar por Jogador</Dialog.Title>
+              <Dialog.Content>
+                  <ScrollView>
+                      <RadioButton.Group onValueChange={val => { setSelectedPlayerId(val === 'all' ? null : val); setPlayerModalVisible(false); }} value={selectedPlayerId || 'all'}>
+                          <RadioButton.Item label="Time Todo" value="all" />
+                          <Divider />
+                          {participatedPlayers.map(p => (
+                              <RadioButton.Item 
+                                key={p.id} 
+                                label={`${(p.surname || p.name).toUpperCase()} (#${p.number})`} 
+                                value={p.id} 
+                              />
+                          ))}
+                      </RadioButton.Group>
+                  </ScrollView>
+              </Dialog.Content>
+              <Dialog.Actions>
+                  <Button onPress={() => setPlayerModalVisible(false)}>Cancelar</Button>
+              </Dialog.Actions>
+          </Dialog>
+      </Portal>
+
+      {/* SET SELECTION MODAL */}
+      <Portal>
+          <Dialog visible={setModalVisible} onDismiss={() => setSetModalVisible(false)}>
+              <Dialog.Title>Filtrar por Set</Dialog.Title>
+              <Dialog.Content>
+                  <ScrollView>
+                      <RadioButton.Group onValueChange={val => { setSelectedSet(val === 'all' ? null : parseInt(val)); setSetModalVisible(false); }} value={selectedSet !== null ? String(selectedSet) : 'all'}>
+                          <RadioButton.Item label="Jogo Todo" value="all" />
+                          <Divider />
+                          {setsPlayed.map(setNum => (
+                              <RadioButton.Item 
+                                key={setNum} 
+                                label={`${setNum}º Set`} 
+                                value={String(setNum)} 
+                              />
+                          ))}
+                      </RadioButton.Group>
+                  </ScrollView>
+              </Dialog.Content>
+              <Dialog.Actions>
+                  <Button onPress={() => setSetModalVisible(false)}>Cancelar</Button>
+              </Dialog.Actions>
+          </Dialog>
+      </Portal>
     </View>
   );
 }

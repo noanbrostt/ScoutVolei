@@ -22,8 +22,21 @@ export const matchService = {
   },
 
   getById: async (matchId: string) => {
-    const res = await db.select().from(matches).where(eq(matches.id, matchId));
-    return res[0];
+    const res = await db.select({
+        match: matches,
+        teamName: teams.name
+    })
+    .from(matches)
+    .leftJoin(teams, eq(matches.teamId, teams.id))
+    .where(eq(matches.id, matchId));
+
+    if (res[0]) {
+        return {
+            ...res[0].match,
+            teamName: res[0].teamName
+        };
+    }
+    return null;
   },
 
   getAll: async () => {
