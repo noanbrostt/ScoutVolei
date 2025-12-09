@@ -11,8 +11,8 @@ export default function LoginScreen() {
 
   const handleLogin = () => {
     // TODO: Implement Firebase Auth
-    // For now, just navigate to dashboard
-    router.replace('/(app)/dashboard');
+    // For now, just navigate to history (Partidas)
+    router.replace('/(app)/history');
   };
 
   return (

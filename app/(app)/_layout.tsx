@@ -19,14 +19,6 @@ export default function AppLayout() {
       }}
     >
       <Tabs.Screen
-        name="dashboard"
-        options={{
-          title: 'Início',
-          tabBarLabel: 'Início',
-          tabBarIcon: ({ color }) => <MaterialIcons name="home" size={24} color={color} />,
-        }}
-      />
-      <Tabs.Screen
         name="teams"
         options={{
           title: 'Times',
