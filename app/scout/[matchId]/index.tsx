@@ -53,6 +53,9 @@ export default function ScoutScreen() {
   const [subOutId, setSubOutId] = useState<string | null>(null);
   const [subInId, setSubInId] = useState<string | null>(null);
 
+  // Finish Set / Match State
+  const [finishSetDialogVisible, setFinishSetDialogVisible] = useState(false);
+
   useFocusEffect(
     useCallback(() => {
       // Force Landscape & Immersive Mode
@@ -83,7 +86,7 @@ export default function ScoutScreen() {
       if (m) {
           const p = await playerService.getByTeamId(m.teamId);
           setAllPlayers(p);
-          loadActions(id);
+          await loadActions(id); // Await this to ensure recentActions are populated
           
           let activeIds: string[] = [];
           if (initialLineup && typeof initialLineup === 'string') {
@@ -104,6 +107,34 @@ export default function ScoutScreen() {
   const loadActions = async (id: string) => {
       const actions = await matchService.getActions(id);
       setRecentActions(actions);
+      
+      // Determine current set from actions
+      if (actions.length > 0) {
+          const maxSet = Math.max(...actions.map(a => a.setNumber));
+          setCurrentSet(maxSet);
+      } else {
+          setCurrentSet(1);
+      }
+  };
+
+  // Compute Score for Current Set
+  const currentSetScoreUs = recentActions
+    .filter(a => a.setNumber === currentSet && a.scoreChange > 0)
+    .length;
+    
+  const currentSetScoreThem = recentActions
+    .filter(a => a.setNumber === currentSet && a.scoreChange < 0)
+    .length;
+
+  const handleNextSet = async () => {
+      setCurrentSet(prev => prev + 1);
+      setFinishSetDialogVisible(false);
+  };
+
+  const handleEndMatch = async () => {
+      if (!match) return;
+      await matchService.finish(match.id);
+      router.replace('/(app)/history');
   };
 
   const sortActivePlayers = (players: any[]) => {
@@ -261,9 +292,14 @@ export default function ScoutScreen() {
                 >
                     +1 NÓS
                 </Button>
-                <Text variant="titleMedium" style={{ color: theme.colors.primary, fontWeight: 'bold' }}>
-                    {match.ourScore} x {match.opponentScore}
-                </Text>
+                <View className="items-center">
+                    <Text variant="titleMedium" style={{ color: theme.colors.primary, fontWeight: 'bold' }}>
+                        {currentSetScoreUs} x {currentSetScoreThem}
+                    </Text>
+                    <Text style={{ color: '#AAA', fontSize: 10, fontWeight: 'bold' }}>
+                        SET {currentSet}
+                    </Text>
+                </View>
                 <Button 
                     mode="contained" 
                     compact
@@ -276,8 +312,20 @@ export default function ScoutScreen() {
                 </Button>
             </View>
             
-            {/* Close Button (Right) */}
-            <IconButton icon="close" size={20} onPress={() => router.replace('/(app)/history')} />
+            {/* Finish Set / Close Button (Right) */}
+             <View className="flex-row items-center gap-1">
+                <Button
+                    mode="outlined"
+                    compact
+                    icon="flag-checkered"
+                    onPress={() => setFinishSetDialogVisible(true)}
+                    textColor={theme.colors.onSurface}
+                    style={{ borderColor: theme.colors.onSurfaceDisabled }}
+                >
+                    Fim Set
+                </Button>
+                <IconButton icon="close" size={20} onPress={() => router.replace('/(app)/history')} />
+            </View>
         </View>
 
         {/* MAIN CONTENT */}
@@ -321,7 +369,7 @@ export default function ScoutScreen() {
             <View className="w-[20%] bg-gray-800 border-r border-gray-700">
                 <Text style={{ color: '#AAA', textAlign: 'center', padding: 4, fontSize: 10, fontWeight: 'bold' }}>HISTÓRICO</Text>
                 <FlatList
-                    data={recentActions}
+                    data={recentActions.filter(a => a.setNumber === currentSet)}
                     keyExtractor={item => item.id}
                     contentContainerStyle={{ padding: 4 }}
                     renderItem={({ item }) => {
@@ -397,6 +445,42 @@ export default function ScoutScreen() {
                 ))}
             </View>
         </View>
+
+        {/* FINISH SET DIALOG */}
+        <Portal>
+            <Dialog visible={finishSetDialogVisible} onDismiss={() => setFinishSetDialogVisible(false)}>
+                <Dialog.Title>Fim do Set {currentSet}</Dialog.Title>
+                <Dialog.Content>
+                    <Text variant="bodyMedium">
+                        O set terminou. O que deseja fazer a seguir?
+                    </Text>
+                    <Text variant="headlineMedium" style={{ textAlign: 'center', marginVertical: 16, fontWeight: 'bold' }}>
+                        {currentSetScoreUs} x {currentSetScoreThem}
+                    </Text>
+                </Dialog.Content>
+                <Dialog.Actions style={{ justifyContent: 'space-between', paddingHorizontal: 8, paddingBottom: 8 }}>
+                    <Button onPress={() => setFinishSetDialogVisible(false)}>
+                        Cancelar
+                    </Button>
+                    <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <Button 
+                            mode="outlined" 
+                            onPress={handleEndMatch}
+                            textColor={theme.colors.error}
+                            style={{ borderColor: theme.colors.error }}
+                        >
+                            Fim Jogo
+                        </Button>
+                        <Button 
+                            mode="contained" 
+                            onPress={handleNextSet}
+                        >
+                            Próximo Set
+                        </Button>
+                    </View>
+                </Dialog.Actions>
+            </Dialog>
+        </Portal>
 
         {/* SUBSTITUTION MODAL */}
         <Portal>

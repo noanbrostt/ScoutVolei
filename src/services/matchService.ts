@@ -185,5 +185,9 @@ export const matchService = {
   undoLastAction: async (matchId: string) => {
       // Logic to undo last action and revert score
       // This is complex, skipping for MVP initial implementation but acknowledging need.
+  },
+
+  finish: async (matchId: string) => {
+    await db.update(matches).set({ isFinished: true, syncStatus: 'pending' }).where(eq(matches.id, matchId));
   }
 };
