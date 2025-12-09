@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useState, useCallback, useMemo } from 'react';
 import { teamService } from '../../../src/services/teamService';
 import { playerService } from '../../../src/services/playerService';
+import { useAuthStore } from '../../../src/store/authStore';
 
 const POSITIONS = ['Ponteiro', 'Central', 'Oposto', 'Levantador', 'Líbero'];
 
@@ -14,6 +15,7 @@ export default function TeamDetails() {
   const [team, setTeam] = useState<any>(null);
   const [players, setPlayers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const user = useAuthStore(s => s.user); // Get user
   
   // Filter State
   const [filterVisible, setFilterVisible] = useState(false);
@@ -92,14 +94,22 @@ export default function TeamDetails() {
 
   if (!team && !loading) return <View className="flex-1 justify-center items-center"><Text>Time não encontrado</Text></View>;
 
+  const isAdmin = user?.role === 'admin';
+
   return (
     <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
       <Appbar.Header style={{ backgroundColor: team?.color || theme.colors.primary }}>
         <Appbar.BackAction onPress={() => router.back()} color="#FFF" />
         <Appbar.Content title={team?.name || 'Detalhes'} titleStyle={{ color: '#FFF', fontWeight: 'bold' }} />
         <Appbar.Action icon="export-variant" color="#FFF" onPress={() => router.push({ pathname: '/(app)/teams/export', params: { teamId: id } })} />
-        <Appbar.Action icon="pencil" color="#FFF" onPress={() => router.push({ pathname: '/(app)/teams/edit', params: { id } })} />
-        <Appbar.Action icon="delete" color="#FFF" onPress={handleDeleteTeam} />
+        
+        {/* Admin Actions */}
+        {isAdmin && (
+            <>
+                <Appbar.Action icon="pencil" color="#FFF" onPress={() => router.push({ pathname: '/(app)/teams/edit', params: { id } })} />
+                <Appbar.Action icon="delete" color="#FFF" onPress={handleDeleteTeam} />
+            </>
+        )}
       </Appbar.Header>
 
       <View className="flex-1 px-4 pt-4">
@@ -138,9 +148,6 @@ export default function TeamDetails() {
             >
               <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/teams/view-player', params: { playerId: item.id } })}>
                 <View className="flex-row items-center p-3">
-                  {/* Avatar/Initial (Optional replacement for number badge, or just text) */}
-                  {/* Let's keep it clean without number badge as requested */}
-
                   {/* Info */}
                   <View className="flex-1 mr-2">
                     <Text variant="titleMedium" style={{ fontWeight: 'bold' }} numberOfLines={1}>
@@ -162,19 +169,24 @@ export default function TeamDetails() {
                       {item.position}
                     </Chip>
                     
-                    <IconButton 
-                      icon="pencil" 
-                      size={20} 
-                      style={{ margin: 0, padding: 0 }}
-                      onPress={() => router.push({ pathname: '/(app)/teams/edit-player', params: { playerId: item.id } })} 
-                    />
-                    <IconButton 
-                      icon="delete" 
-                      size={20} 
-                      iconColor={theme.colors.error}
-                      style={{ margin: 0, padding: 0 }}
-                      onPress={() => handleDeletePlayer(item.id)} 
-                    />
+                    {/* Admin Player Actions */}
+                    {isAdmin && (
+                        <>
+                            <IconButton 
+                                icon="pencil" 
+                                size={20} 
+                                style={{ margin: 0, padding: 0 }}
+                                onPress={() => router.push({ pathname: '/(app)/teams/edit-player', params: { playerId: item.id } })} 
+                            />
+                            <IconButton 
+                                icon="delete" 
+                                size={20} 
+                                iconColor={theme.colors.error}
+                                style={{ margin: 0, padding: 0 }}
+                                onPress={() => handleDeletePlayer(item.id)} 
+                            />
+                        </>
+                    )}
                   </View>
                 </View>
               </TouchableOpacity>
@@ -183,19 +195,22 @@ export default function TeamDetails() {
         />
       </View>
 
-      <FAB
-        icon="account-plus"
-        label="Novo Jogador"
-        style={{
-          position: 'absolute',
-          margin: 16,
-          right: 0,
-          bottom: 0,
-          backgroundColor: theme.colors.primary
-        }}
-        color="#FFF"
-        onPress={() => router.push({ pathname: '/(app)/teams/add-player', params: { teamId: id } })}
-      />
+      {/* Admin FAB */}
+      {isAdmin && (
+        <FAB
+            icon="account-plus"
+            label="Novo Jogador"
+            style={{
+            position: 'absolute',
+            margin: 16,
+            right: 0,
+            bottom: 0,
+            backgroundColor: theme.colors.primary
+            }}
+            color="#FFF"
+            onPress={() => router.push({ pathname: '/(app)/teams/add-player', params: { teamId: id } })}
+        />
+      )}
 
       {/* Filter Dialog */}
       <Portal>

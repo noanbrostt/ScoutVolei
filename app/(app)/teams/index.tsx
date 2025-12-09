@@ -4,12 +4,14 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { teamService } from '../../../src/services/teamService';
+import { useAuthStore } from '../../../src/store/authStore';
 
 export default function TeamsList() {
   const theme = useTheme();
   const router = useRouter();
   const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const user = useAuthStore(s => s.user); // Get user
 
   const loadTeams = async () => {
     setLoading(true);
@@ -54,12 +56,14 @@ export default function TeamsList() {
           <Text variant="bodyMedium" style={{ textAlign: 'center', marginTop: 8, marginBottom: 24, opacity: 0.7 }}>
             Cadastre seu primeiro time para começar a registrar scouts e estatísticas.
           </Text>
-          <FAB
-             icon="plus"
-             label="Criar Novo Time"
-             extended
-             onPress={() => router.push('/(app)/teams/new')}
-          />
+          {user?.role === 'admin' && (
+            <FAB
+               icon="plus"
+               label="Criar Novo Time"
+               extended
+               onPress={() => router.push('/(app)/teams/new')}
+            />
+          )}
         </View>
       ) : (
         <FlatList
@@ -92,7 +96,7 @@ export default function TeamsList() {
         />
       )}
 
-      {teams.length > 0 && (
+      {teams.length > 0 && user?.role === 'admin' && (
         <FAB
           icon="plus"
           style={{

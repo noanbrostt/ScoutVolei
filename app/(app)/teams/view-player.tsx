@@ -3,12 +3,14 @@ import { Text, Appbar, useTheme, Card, Divider, Avatar, Chip } from 'react-nativ
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useState, useCallback } from 'react';
 import { playerService } from '../../../src/services/playerService';
+import { useAuthStore } from '../../../src/store/authStore';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ViewPlayer() {
   const router = useRouter();
   const { playerId } = useLocalSearchParams();
   const theme = useTheme();
+  const user = useAuthStore(s => s.user); // Get user
   
   const [player, setPlayer] = useState<any>(null);
 
@@ -38,7 +40,9 @@ export default function ViewPlayer() {
       <Appbar.Header>
         <Appbar.BackAction onPress={() => router.back()} />
         <Appbar.Content title="Detalhes do Atleta" />
-        <Appbar.Action icon="pencil" onPress={() => router.push({ pathname: '/(app)/teams/edit-player', params: { playerId } })} />
+        {user?.role === 'admin' && (
+            <Appbar.Action icon="pencil" onPress={() => router.push({ pathname: '/(app)/teams/edit-player', params: { playerId } })} />
+        )}
       </Appbar.Header>
 
       <ScrollView contentContainerStyle={{ padding: 16 }}>
