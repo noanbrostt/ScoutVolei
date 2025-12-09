@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "MeuAppVolei",
-    "slug": "meuappvolei",
+    "name": "ScoutVolei",
+    "slug": "scoutvolei",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -14,7 +14,7 @@
     "plugins": [
       "expo-router"
     ],
-    "scheme": "meuappvolei",
+    "scheme": "scoutvolei",
     "newArchEnabled": true,
     "extra": {
       "router": {},
