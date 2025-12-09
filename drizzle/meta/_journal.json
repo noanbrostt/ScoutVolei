@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "6",
-      "when": 1764728090838,
-      "tag": "0000_graceful_piledriver",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "6",
-      "when": 1764728090900,
-      "tag": "0001_add_team_color",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "6",
-      "when": 1764728090950,
-      "tag": "0002_add_player_allergies",
+      "when": 1765296634475,
+      "tag": "0000_initial-schema",
       "breakpoints": true
     }
   ]

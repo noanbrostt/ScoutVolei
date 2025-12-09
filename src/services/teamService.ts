@@ -37,9 +37,14 @@ export const teamService = {
   },
 
   delete: async (id: string) => {
-    // Delete related players first
-    await db.delete(players).where(eq(players.teamId, id));
-    // Then delete the team
-    await db.delete(teams).where(eq(teams.id, id));
+    // Mark related players for soft delete first
+    await db.update(players)
+      .set({ deleted: true, syncStatus: 'pending' })
+      .where(eq(players.teamId, id));
+      
+    // Then mark the team for soft delete
+    await db.update(teams)
+      .set({ deleted: true, syncStatus: 'pending' })
+      .where(eq(teams.id, id));
   }
 };

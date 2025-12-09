@@ -51,7 +51,7 @@ export default function EditPlayer() {
         if (player) {
           setName(player.name);
           setSurname(player.surname || '');
-          setNumber(player.number.toString());
+          setNumber(player.number?.toString() || ''); // Handle null number
           setPosition(player.position);
           setRg(player.rg || '');
           setCpf(player.cpf || '');
@@ -65,23 +65,24 @@ export default function EditPlayer() {
   }, [playerId]);
 
   const handleSave = async () => {
-    if (!name.trim() || !number.trim() || typeof playerId !== 'string') return;
+    if (!name.trim() || typeof playerId !== 'string') return; // Name is still required
     
     setSaving(true);
     try {
       await playerService.update(playerId, {
         name,
-        surname,
-        number: parseInt(number),
+        surname: surname.trim() === '' ? null : surname,
+        number: number.trim() === '' ? null : parseInt(number), // Pass null if empty
         position,
-        rg,
-        cpf,
-        birthday,
-        allergies
+        rg: rg.trim() === '' ? null : rg,
+        cpf: cpf.trim() === '' ? null : cpf,
+        birthday: birthday.trim() === '' ? null : birthday,
+        allergies: allergies.trim() === '' ? null : allergies,
       });
       router.back();
     } catch (e) {
       console.error(e);
+      // You might want to show an Alert to the user here
     } finally {
       setSaving(false);
     }
@@ -116,7 +117,7 @@ export default function EditPlayer() {
           mode="outlined"
         />
         <TextInput
-          label="Número da Camisa *"
+          label="Número da Camisa" // No asterisk
           value={number}
           onChangeText={setNumber}
           mode="outlined"
@@ -185,7 +186,7 @@ export default function EditPlayer() {
           mode="contained" 
           onPress={handleSave} 
           loading={saving} 
-          disabled={!name.trim() || !number.trim() || saving}
+          disabled={!name.trim() || saving} // number is now optional
           style={{ marginTop: 16, marginBottom: 32 }}
         >
           Salvar Alterações

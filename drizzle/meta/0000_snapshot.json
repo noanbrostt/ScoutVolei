@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "161989d0-6cb5-46d0-8e4c-f8ae570da773",
+  "id": "6c47a2a2-1fbe-43ed-8e75-9f06640fdf04",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "match_actions": {
@@ -71,6 +71,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'pending'"
+        },
+        "deleted": {
+          "name": "deleted",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         }
       },
       "indexes": {},
@@ -182,6 +190,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'pending'"
+        },
+        "deleted": {
+          "name": "deleted",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         }
       },
       "indexes": {},
@@ -239,7 +255,7 @@
           "name": "number",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
+          "notNull": false,
           "autoincrement": false
         },
         "position": {
@@ -277,6 +293,13 @@
           "notNull": false,
           "autoincrement": false
         },
+        "allergies": {
+          "name": "allergies",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "text",
@@ -291,6 +314,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'pending'"
+        },
+        "deleted": {
+          "name": "deleted",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         }
       },
       "indexes": {},
@@ -330,12 +361,13 @@
           "notNull": true,
           "autoincrement": false
         },
-        "city": {
-          "name": "city",
+        "color": {
+          "name": "color",
           "type": "text",
           "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
+          "notNull": true,
+          "autoincrement": false,
+          "default": "'#2196F3'"
         },
         "created_at": {
           "name": "created_at",
@@ -358,6 +390,14 @@
           "notNull": true,
           "autoincrement": false,
           "default": "'pending'"
+        },
+        "deleted": {
+          "name": "deleted",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": false
         }
       },
       "indexes": {},

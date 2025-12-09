@@ -63,6 +63,8 @@ export const playerService = {
   },
   
   delete: async (id: string) => {
-    await db.delete(players).where(eq(players.id, id));
+    await db.update(players)
+      .set({ deleted: true, syncStatus: 'pending' })
+      .where(eq(players.id, id));
   }
 };

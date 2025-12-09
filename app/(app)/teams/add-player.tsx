@@ -46,24 +46,25 @@ export default function AddPlayer() {
   };
 
   const handleSave = async () => {
-    if (!name.trim() || !number.trim() || typeof teamId !== 'string') return;
+    if (!name.trim() || typeof teamId !== 'string') return; // Name is still required
     
     setSaving(true);
     try {
       await playerService.create({
         teamId,
         name,
-        surname,
-        number: parseInt(number),
+        surname: surname.trim() === '' ? null : surname,
+        number: number.trim() === '' ? null : parseInt(number), // Pass null if empty
         position,
-        rg,
-        cpf,
-        birthday,
-        allergies
+        rg: rg.trim() === '' ? null : rg,
+        cpf: cpf.trim() === '' ? null : cpf,
+        birthday: birthday.trim() === '' ? null : birthday,
+        allergies: allergies.trim() === '' ? null : allergies,
       });
       router.back();
     } catch (e) {
       console.error(e);
+      // You might want to show an Alert to the user here
     } finally {
       setSaving(false);
     }
@@ -90,7 +91,7 @@ export default function AddPlayer() {
           mode="outlined"
         />
         <TextInput
-          label="Número da Camisa *"
+          label="Número da Camisa" // No asterisk
           value={number}
           onChangeText={setNumber}
           mode="outlined"
@@ -159,7 +160,7 @@ export default function AddPlayer() {
           mode="contained" 
           onPress={handleSave} 
           loading={saving} 
-          disabled={!name.trim() || !number.trim() || saving}
+          disabled={!name.trim() || saving} // number is now optional
           style={{ marginTop: 16, marginBottom: 32 }}
         >
           Salvar Jogador

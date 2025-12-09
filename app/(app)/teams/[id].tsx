@@ -138,21 +138,23 @@ export default function TeamDetails() {
             >
               <View className="flex-row items-center p-2 pl-3">
                 {/* Number Badge */}
-                <View 
-                  style={{ 
-                    width: 36, 
-                    height: 36, 
-                    borderRadius: 18, 
-                    backgroundColor: theme.colors.secondaryContainer,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginRight: 10
-                  }}
-                >
-                  <Text style={{ fontWeight: 'bold', color: theme.colors.onSecondaryContainer, fontSize: 14 }}>
-                    {item.number}
-                  </Text>
-                </View>
+                {item.number !== null && item.number !== undefined && ( 
+                  <View 
+                    style={{ 
+                      width: 36, 
+                      height: 36, 
+                      borderRadius: 18, 
+                      backgroundColor: theme.colors.secondaryContainer,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginRight: 10
+                    }}
+                  >
+                    <Text style={{ fontWeight: 'bold', color: theme.colors.onSecondaryContainer, fontSize: 14 }}>
+                      {item.number}
+                    </Text>
+                  </View>
+                )}
 
                 {/* Info */}
                 <View className="flex-1 mr-2">

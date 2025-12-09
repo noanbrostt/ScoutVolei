@@ -8,6 +8,7 @@ CREATE TABLE `match_actions` (
 	`score_change` integer DEFAULT 0,
 	`timestamp` text NOT NULL,
 	`sync_status` text DEFAULT 'pending' NOT NULL,
+	`deleted` integer DEFAULT false NOT NULL,
 	FOREIGN KEY (`match_id`) REFERENCES `matches`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`player_id`) REFERENCES `players`(`id`) ON UPDATE no action ON DELETE no action
 );
@@ -20,9 +21,10 @@ CREATE TABLE `matches` (
 	`location` text,
 	`our_score` integer DEFAULT 0,
 	`opponent_score` integer DEFAULT 0,
-	`is_finished` integer DEFAULT 0,
+	`is_finished` integer DEFAULT false,
 	`created_at` text NOT NULL,
 	`sync_status` text DEFAULT 'pending' NOT NULL,
+	`deleted` integer DEFAULT false NOT NULL,
 	FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
@@ -31,22 +33,25 @@ CREATE TABLE `players` (
 	`team_id` text NOT NULL,
 	`name` text NOT NULL,
 	`surname` text,
-	`number` integer NOT NULL,
+	`number` integer,
 	`position` text NOT NULL,
 	`cpf` text,
 	`rg` text,
 	`birthday` text,
 	`height` real,
+	`allergies` text,
 	`created_at` text NOT NULL,
 	`sync_status` text DEFAULT 'pending' NOT NULL,
+	`deleted` integer DEFAULT false NOT NULL,
 	FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`) ON UPDATE no action ON DELETE no action
 );
 --> statement-breakpoint
 CREATE TABLE `teams` (
 	`id` text PRIMARY KEY NOT NULL,
 	`name` text NOT NULL,
-	`city` text,
+	`color` text DEFAULT '#2196F3' NOT NULL,
 	`created_at` text NOT NULL,
 	`updated_at` text NOT NULL,
-	`sync_status` text DEFAULT 'pending' NOT NULL
+	`sync_status` text DEFAULT 'pending' NOT NULL,
+	`deleted` integer DEFAULT false NOT NULL
 );

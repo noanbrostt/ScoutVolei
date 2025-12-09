@@ -7,6 +7,7 @@ export const teams = sqliteTable('teams', {
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),
   syncStatus: text('sync_status').$type<'pending' | 'synced'>().default('pending').notNull(),
+  deleted: integer('deleted', { mode: 'boolean' }).default(false).notNull(),
 });
 
 export const players = sqliteTable('players', {
@@ -14,7 +15,7 @@ export const players = sqliteTable('players', {
   teamId: text('team_id').references(() => teams.id).notNull(),
   name: text('name').notNull(),
   surname: text('surname'),
-  number: integer('number').notNull(),
+  number: integer('number'),
   position: text('position').notNull(), // 'Ponteiro', 'Central', 'Oposto', 'Levantador', 'Líbero'
   cpf: text('cpf'),
   rg: text('rg'),
@@ -23,6 +24,7 @@ export const players = sqliteTable('players', {
   allergies: text('allergies'),
   createdAt: text('created_at').notNull(),
   syncStatus: text('sync_status').$type<'pending' | 'synced'>().default('pending').notNull(),
+  deleted: integer('deleted', { mode: 'boolean' }).default(false).notNull(),
 });
 
 export const matches = sqliteTable('matches', {
@@ -36,6 +38,7 @@ export const matches = sqliteTable('matches', {
   isFinished: integer('is_finished', { mode: 'boolean' }).default(false),
   createdAt: text('created_at').notNull(),
   syncStatus: text('sync_status').$type<'pending' | 'synced'>().default('pending').notNull(),
+  deleted: integer('deleted', { mode: 'boolean' }).default(false).notNull(),
 });
 
 export const matchActions = sqliteTable('match_actions', {
@@ -48,4 +51,5 @@ export const matchActions = sqliteTable('match_actions', {
   scoreChange: integer('score_change').default(0), // 1, -1, 0
   timestamp: text('timestamp').notNull(),
   syncStatus: text('sync_status').$type<'pending' | 'synced'>().default('pending').notNull(),
+  deleted: integer('deleted', { mode: 'boolean' }).default(false).notNull(),
 });

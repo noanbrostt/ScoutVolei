@@ -10,6 +10,8 @@ import { View, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useEffect } from "react";
+import { syncService } from "../src/services/syncService"; // Import syncService
 
 export default function RootLayout() {
   const { mode } = useThemeStore();
@@ -23,6 +25,12 @@ export default function RootLayout() {
     ...MaterialIcons.font,
     ...MaterialCommunityIcons.font,
   });
+
+  useEffect(() => {
+    if (success && fontsLoaded) {
+      syncService.startPeriodicSync();
+    }
+  }, [success, fontsLoaded]);
 
   if (error) {
     return (
