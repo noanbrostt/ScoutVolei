@@ -1,7 +1,7 @@
 import { View, Alert } from 'react-native';
 import { Button, TextInput, Text, useTheme } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '../src/store/authStore';
 
 export default function LoginScreen() {
