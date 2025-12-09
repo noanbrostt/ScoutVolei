@@ -53,12 +53,6 @@ export default function ScoutScreen() {
   const [subOutId, setSubOutId] = useState<string | null>(null);
   const [subInId, setSubInId] = useState<string | null>(null);
 
-  // Action Log Edit/Delete State
-  const [editActionDetailsModalVisible, setEditActionDetailsModalVisible] = useState(false);
-  const [selectedLogAction, setSelectedLogAction] = useState<any>(null); // The action object from the log
-  const [editingActionType, setEditingActionType] = useState('');
-  const [editingQuality, setEditingQuality] = useState(0);
-
   useFocusEffect(
     useCallback(() => {
       // Force Landscape & Immersive Mode
@@ -135,23 +129,12 @@ export default function ScoutScreen() {
           { text: 'Excluir', style: 'destructive', onPress: async () => {
               await matchService.deleteAction(actionId);
               refreshMatch();
-              setEditActionDetailsModalVisible(false); // Close modal after delete
           }}
       ]);
   };
-  
-  const handleUpdateActionDetails = async () => {
-      if (!selectedLogAction) return;
-      await matchService.updateActionDetails(selectedLogAction.id, editingActionType, editingQuality);
-      refreshMatch();
-      setEditActionDetailsModalVisible(false);
-  };
 
   const handleActionLogPress = (action: any) => {
-      setSelectedLogAction(action);
-      setEditingActionType(action.actionType);
-      setEditingQuality(action.quality);
-      setEditActionDetailsModalVisible(true);
+      handleDeleteAction(action.id);
   };
 
   // --- Core Logic: Register Action ---
@@ -361,7 +344,7 @@ export default function ScoutScreen() {
                             >
                                 <View>
                                     <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 12 }}>
-                                        {player ? (player.surname || player.name).toUpperCase() : 'GERAL'}
+                                        {player ? (player.surname || player.name || "").toUpperCase() : 'GERAL'}
                                     </Text>
                                     <View className="flex-row justify-between">
                                         <Text style={{ color: '#CCC', fontSize: 10 }}>{item.actionType}</Text>
@@ -475,79 +458,6 @@ export default function ScoutScreen() {
                 <Dialog.Actions>
                     <Button onPress={() => setSubModalVisible(false)}>Cancelar</Button>
                     <Button mode="contained" onPress={confirmSubstitution} disabled={!subOutId || !subInId}>Confirmar</Button>
-                </Dialog.Actions>
-            </Dialog>
-        </Portal>
-        
-        {/* Edit Action Details Modal */}
-        <Portal>
-            <Dialog visible={editActionDetailsModalVisible} onDismiss={() => setEditActionDetailsModalVisible(false)} style={{ maxHeight: '90%' }}>
-                <Dialog.Title style={{ fontSize: 18, paddingBottom: 10 }}>Editar Ação</Dialog.Title>
-                <Dialog.Content>
-                    {selectedLogAction && (
-                        <View>
-                            <Text variant="titleMedium" style={{ marginBottom: 12 }}>
-                                Jogador: {allPlayers.find(p => p.id === selectedLogAction.playerId)?.surname.toUpperCase() || 'GERAL'}
-                            </Text>
-
-                            <Text variant="labelLarge" style={{ marginBottom: 8 }}>Tipo de Ação:</Text>
-                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                                <View className="flex-row gap-2">
-                                    {ACTIONS.map((act) => (
-                                        <Button
-                                            key={act.key}
-                                            mode={editingActionType === act.key ? 'contained' : 'outlined'}
-                                            onPress={() => setEditingActionType(act.key)}
-                                            compact
-                                            style={{ minWidth: 60 }}
-                                        >
-                                            {act.label}
-                                        </Button>
-                                    ))}
-                                </View>
-                            </ScrollView>
-
-                            <Text variant="labelLarge" style={{ marginBottom: 8 }}>Qualidade:</Text>
-                            <View className="flex-row justify-around gap-2">
-                                {QUALITIES.map((q) => (
-                                    <Button 
-                                        key={q.val}
-                                        mode={editingQuality === q.val ? 'contained' : 'outlined'} 
-                                        buttonColor={editingQuality === q.val ? q.color : undefined}
-                                        onPress={() => setEditingQuality(q.val)}
-                                        style={{ flex: 1 }}
-                                    >
-                                        {q.label}
-                                    </Button>
-                                ))}
-                            </View>
-                        </View>
-                    )}
-                </Dialog.Content>
-                <Dialog.Actions className="flex-col gap-2 p-4">
-                    <Button 
-                        mode="contained" 
-                        onPress={handleUpdateActionDetails}
-                        style={{ width: '100%' }}
-                        disabled={!selectedLogAction || !editingActionType}
-                    >
-                        Salvar Edição
-                    </Button>
-                    <Button 
-                        mode="outlined" 
-                        onPress={() => handleDeleteAction(selectedLogAction.id)}
-                        textColor={theme.colors.error}
-                        style={{ width: '100%' }}
-                    >
-                        Excluir Ação
-                    </Button>
-                    <Button 
-                        mode="text" 
-                        onPress={() => setEditActionDetailsModalVisible(false)}
-                        style={{ width: '100%' }}
-                    >
-                        Cancelar
-                    </Button>
                 </Dialog.Actions>
             </Dialog>
         </Portal>

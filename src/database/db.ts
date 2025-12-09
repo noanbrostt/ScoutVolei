@@ -4,3 +4,4 @@ import * as schema from './schemas';
 
 const expoDb = openDatabaseSync('scoutvolei.db');
 export const db = drizzle(expoDb, { schema });
+

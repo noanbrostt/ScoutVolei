@@ -6,7 +6,8 @@ module.exports = function (api) {
       "nativewind/babel",
     ],
     plugins: [
-      ["inline-import", { "extensions": [".sql"] }]
-    ]
+      ["inline-import", { "extensions": [".sql"] }],
+      "babel-plugin-transform-import-meta",
+    ],
   };
 };
