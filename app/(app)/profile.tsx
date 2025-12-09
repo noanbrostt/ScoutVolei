@@ -3,6 +3,7 @@ import { Text, Button, List, Switch, useTheme, Divider, Card, Avatar, ActivityIn
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeStore } from '../../src/store/themeStore';
+import { useAuthStore } from '../../src/store/authStore';
 import { syncService } from '../../src/services/syncService';
 import { useState } from 'react';
 
@@ -10,12 +11,18 @@ export default function Profile() {
   const theme = useTheme();
   const router = useRouter();
   const { mode, setMode } = useThemeStore();
+  const { user, logout } = useAuthStore();
   const [syncing, setSyncing] = useState(false);
 
   const isDarkMode = mode === 'dark';
 
   const toggleTheme = () => {
     setMode(isDarkMode ? 'light' : 'dark');
+  };
+
+  const handleLogout = () => {
+      logout();
+      router.replace('/');
   };
 
   const handleSync = async () => {
@@ -44,14 +51,14 @@ export default function Profile() {
           </Text>
         </View>
 
-        {/* USER CARD (Placeholder for now) */}
+        {/* USER CARD */}
         <View className="px-4 mb-6">
             <Card mode="elevated" style={{ backgroundColor: theme.colors.surface }}>
                 <Card.Content style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Avatar.Icon size={50} icon="account" style={{ backgroundColor: theme.colors.primaryContainer }} />
                     <View style={{ marginLeft: 16 }}>
-                        <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>Usuário Exemplo</Text>
-                        <Text variant="bodySmall">Técnico</Text>
+                        <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>{user?.name || 'Usuário'}</Text>
+                        <Text variant="bodySmall" style={{ textTransform: 'capitalize' }}>{user?.role || 'Visitante'}</Text>
                     </View>
                 </Card.Content>
             </Card>
@@ -91,7 +98,7 @@ export default function Profile() {
                 buttonColor={theme.colors.errorContainer}
                 textColor={theme.colors.onErrorContainer}
                 icon="logout"
-                onPress={() => router.replace('/')}
+                onPress={handleLogout}
             >
             Sair
             </Button>

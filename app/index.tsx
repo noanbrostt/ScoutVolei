@@ -1,18 +1,30 @@
-import { View } from 'react-native';
+import { View, Alert } from 'react-native';
 import { Button, TextInput, Text, useTheme } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
+import { useAuthStore } from '../src/store/authStore';
 
 export default function LoginScreen() {
   const router = useRouter();
   const theme = useTheme();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const { login, user } = useAuthStore(); // Get user from store
+
+  // Auto-redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      router.replace('/(app)/history');
+    }
+  }, [user]);
 
   const handleLogin = () => {
-    // TODO: Implement Firebase Auth
-    // For now, just navigate to history (Partidas)
-    router.replace('/(app)/history');
+    const success = login(username, password);
+    if (success) {
+      router.replace('/(app)/history');
+    } else {
+      Alert.alert("Erro", "Usuário ou senha incorretos.");
+    }
   };
 
   return (
@@ -22,11 +34,12 @@ export default function LoginScreen() {
       </Text>
       
       <TextInput
-        label="Email"
-        value={email}
-        onChangeText={setEmail}
+        label="Usuário"
+        value={username}
+        onChangeText={setUsername}
         style={{ width: '100%', marginBottom: 16 }}
         mode="outlined"
+        autoCapitalize="none"
       />
       
       <TextInput
