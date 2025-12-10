@@ -97,12 +97,12 @@ export default function MatchesHistory() {
                       </View>
                   </View>
                   
-                  <View className="flex-row mt-2 items-center justify-center gap-4 bg-gray-100 dark:bg-gray-800 p-2 rounded-lg">
+                  <View style={{ flexDirection: 'row', marginTop: 8, alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: theme.colors.surfaceVariant, padding: 8, borderRadius: 8 }}>
                       <View className="items-center">
-                        <Text variant="labelSmall" style={{ color: '#888' }}>SETS</Text>
-                        <View className="flex-row items-center gap-2">
+                        <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>SETS</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                              <Text variant="headlineMedium" style={{ fontWeight: 'bold', color: theme.colors.primary }}>{item.setsUs}</Text>
-                             <Text variant="labelLarge" style={{ color: theme.colors.secondary }}>X</Text>
+                             <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>X</Text>
                              <Text variant="headlineMedium" style={{ fontWeight: 'bold', color: theme.colors.error }}>{item.setsThem}</Text>
                         </View>
                       </View>
