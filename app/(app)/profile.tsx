@@ -91,20 +91,27 @@ export default function Profile() {
             </Card>
         </View>
 
-        {/* LOGOUT BUTTON */}
-        <View className="p-4 mt-auto">
-            <Button 
-                mode="contained" 
-                buttonColor={theme.colors.error}
-                textColor="#FFFFFF"
-                icon="logout"
-                onPress={handleLogout}
-            >
-            Sair
-            </Button>
-        </View>
-
-      </SafeAreaView>
-    </View>
-  );
-}
+                {/* LOGOUT BUTTON */}
+                <View className="p-4 pb-2 mt-auto">
+                    <Button
+                        mode="contained"
+                        buttonColor={theme.colors.error}
+                        textColor="#FFFFFF"
+                        icon="logout"
+                        onPress={handleLogout}
+                    >
+                    Sair
+                    </Button>
+                </View>
+        
+                {/* COPYRIGHT NOTICE */}
+                <View className="items-center mb-2">
+                    <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant, opacity: 0.6 }}>
+                        © Noan Caliel Brostt
+                    </Text>
+                </View>
+        
+              </SafeAreaView>
+            </View>
+          );
+        }
