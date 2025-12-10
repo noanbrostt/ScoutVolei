@@ -256,7 +256,13 @@ export default function ScoutScreen() {
 
   const getReservePlayers = () => {
     const activeIds = activePlayers.map(p => p.id);
-    return allPlayers.filter(p => !activeIds.includes(p.id));
+    return allPlayers
+        .filter(p => !activeIds.includes(p.id))
+        .sort((a, b) => {
+            const na = a.surname || a.name;
+            const nb = b.surname || b.name;
+            return na.localeCompare(nb);
+        });
   };
 
 
@@ -272,10 +278,11 @@ export default function ScoutScreen() {
             <Button 
                 mode="contained-tonal" 
                 compact 
-                icon="swap-horizontal" // Re-added icon
+                icon="swap-horizontal" 
                 onPress={() => setSubModalVisible(true)}
-                labelStyle={{ fontSize: 12, marginHorizontal: 0 }} // More compact label
-                style={{ height: 36, justifyContent: 'center', paddingHorizontal: 8 }} // Adjusted height and padding
+                contentStyle={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                labelStyle={{ fontSize: 12, marginHorizontal: 0, lineHeight: 12 }}
+                style={{ height: 36, justifyContent: 'center', paddingHorizontal: 8 }} 
             >
                 Substituir
             </Button>
@@ -288,7 +295,7 @@ export default function ScoutScreen() {
                     buttonColor="#1B5E20" 
                     onPress={() => handleGenericPoint('our')}
                     labelStyle={{ fontSize: 12, marginHorizontal: 8 }} 
-                    textColor="#FFF" // Explicitly white
+                    textColor="#FFF" 
                 >
                     +1 NÓS
                 </Button>
@@ -306,7 +313,7 @@ export default function ScoutScreen() {
                     buttonColor="#B71C1C" 
                     onPress={() => handleGenericPoint('opponent')}
                     labelStyle={{ fontSize: 12, marginHorizontal: 8 }} 
-                    textColor="#FFF" // Explicitly white
+                    textColor="#FFF" 
                 >
                     +1 DELES
                 </Button>
@@ -319,12 +326,12 @@ export default function ScoutScreen() {
                     compact
                     icon="flag-checkered"
                     onPress={() => setFinishSetDialogVisible(true)}
-                    textColor={theme.colors.onSurface}
-                    style={{ borderColor: theme.colors.onSurfaceDisabled }}
+                    textColor="#E0E0E0"
+                    style={{ borderColor: "#666" }}
                 >
                     Fim Set
                 </Button>
-                <IconButton icon="close" size={20} onPress={() => router.replace('/(app)/history')} />
+                <IconButton icon="close" size={20} iconColor="#E0E0E0" onPress={() => router.replace('/(app)/history')} />
             </View>
         </View>
 
@@ -380,7 +387,7 @@ export default function ScoutScreen() {
 
                         return (
                             <TouchableRipple 
-                                onPress={() => handleActionLogPress(item)} // Changed to handleActionLogPress
+                                onPress={() => handleActionLogPress(item)} 
                                 style={{ 
                                     marginBottom: 4, 
                                     padding: 6, 
@@ -448,13 +455,10 @@ export default function ScoutScreen() {
 
         {/* FINISH SET DIALOG */}
         <Portal>
-            <Dialog visible={finishSetDialogVisible} onDismiss={() => setFinishSetDialogVisible(false)}>
-                <Dialog.Title>Fim do Set {currentSet}</Dialog.Title>
+            <Dialog visible={finishSetDialogVisible} onDismiss={() => setFinishSetDialogVisible(false)} style={{ maxWidth: 400, alignSelf: 'center', width: '90%' }}>
+                <Dialog.Title style={{ textAlign: 'center' }}>Fim do Set {currentSet}</Dialog.Title>
                 <Dialog.Content>
-                    <Text variant="bodyMedium">
-                        O set terminou. O que deseja fazer a seguir?
-                    </Text>
-                    <Text variant="headlineMedium" style={{ textAlign: 'center', marginVertical: 16, fontWeight: 'bold' }}>
+                    <Text variant="headlineMedium" style={{ textAlign: 'center', marginTop: 8, marginBottom: 0, fontWeight: 'bold' }}>
                         {currentSetScoreUs} x {currentSetScoreThem}
                     </Text>
                 </Dialog.Content>
@@ -485,7 +489,6 @@ export default function ScoutScreen() {
         {/* SUBSTITUTION MODAL */}
         <Portal>
             <Dialog visible={subModalVisible} onDismiss={() => setSubModalVisible(false)} style={{ maxHeight: '90%' }}>
-                <Dialog.Title style={{ fontSize: 18, paddingBottom: 10 }}>Substituição</Dialog.Title>
                 <Dialog.Content>
                     <View style={{ height: 200, overflow: 'hidden' }}> 
                         {/* Headers Fixed */}

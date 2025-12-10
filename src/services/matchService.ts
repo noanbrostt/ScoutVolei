@@ -47,6 +47,7 @@ export const matchService = {
       })
       .from(matches)
       .leftJoin(teams, eq(matches.teamId, teams.id))
+      .where(eq(matches.deleted, false)) // Filter out deleted matches
       .orderBy(desc(matches.date));
 
       // Calculate set scores for each match

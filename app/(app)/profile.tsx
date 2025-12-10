@@ -94,9 +94,9 @@ export default function Profile() {
         {/* LOGOUT BUTTON */}
         <View className="p-4 mt-auto">
             <Button 
-                mode="contained-tonal" 
-                buttonColor={theme.colors.errorContainer}
-                textColor={theme.colors.onErrorContainer}
+                mode="contained" 
+                buttonColor={theme.colors.error}
+                textColor="#FFFFFF"
                 icon="logout"
                 onPress={handleLogout}
             >

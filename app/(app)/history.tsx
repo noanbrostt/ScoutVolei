@@ -4,10 +4,12 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useState } from 'react';
 import { matchService } from '../../src/services/matchService';
+import { useAuthStore } from '../../src/store/authStore';
 
 export default function MatchesHistory() {
   const theme = useTheme();
   const router = useRouter();
+  const { user } = useAuthStore();
   const [matches, setMatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -67,13 +69,6 @@ export default function MatchesHistory() {
                           <Text variant="bodySmall">{item.location || 'Sem local'}</Text>
                       </View>
                       <View className="items-center gap-2">
-                        <IconButton 
-                            icon="trash-can-outline" 
-                            size={20} 
-                            iconColor={theme.colors.error} 
-                            onPress={() => handleDelete(item.id)}
-                            style={{ margin: 0 }}
-                        />
                         <View 
                             style={{ 
                                 borderWidth: 1, 
@@ -90,6 +85,15 @@ export default function MatchesHistory() {
                                 color={item.isFinished ? theme.colors.primary : '#FBC02D'}
                             />
                         </View>
+                        {user?.role === 'admin' && (
+                            <IconButton 
+                                icon="trash-can-outline" 
+                                size={20} 
+                                iconColor={theme.colors.error} 
+                                onPress={() => handleDelete(item.id)}
+                                style={{ margin: 0 }}
+                            />
+                        )}
                       </View>
                   </View>
                   
