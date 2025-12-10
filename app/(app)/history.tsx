@@ -2,9 +2,10 @@ import { View, FlatList, RefreshControl, Alert } from 'react-native';
 import { Text, useTheme, FAB, Card, Chip, IconButton, TouchableRipple, ActivityIndicator, Icon } from 'react-native-paper';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { matchService } from '../../src/services/matchService';
 import { useAuthStore } from '../../src/store/authStore';
+import { syncService } from '../../src/services/syncService';
 
 export default function MatchesHistory() {
   const theme = useTheme();
@@ -25,6 +26,13 @@ export default function MatchesHistory() {
       loadMatches();
     }, [])
   );
+
+  useEffect(() => {
+    const unsubscribe = syncService.subscribe(() => {
+      loadMatches();
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleMatchPress = (match: any) => {
       if (match.isFinished) {
@@ -60,7 +68,12 @@ export default function MatchesHistory() {
               <Card.Content>
                   <View className="flex-row justify-between items-start">
                       <View className="flex-1">
-                          <Text variant="labelMedium" style={{ color: theme.colors.outline }}>{date}</Text>
+                          <View className="flex-row items-center gap-2">
+                            <Text variant="labelMedium" style={{ color: theme.colors.outline }}>{date}</Text>
+                            {item.hasPendingData && (
+                                <Icon source="cloud-upload" size={16} color="#F9A825" />
+                            )}
+                          </View>
                           <View className="flex-row items-center gap-1 flex-wrap">
                              <Text variant="titleMedium" style={{ fontWeight: 'bold', fontSize: 19, color: theme.colors.primary }}>{item.teamName}</Text>
                              <Text variant="bodyLarge" style={{ marginHorizontal: 4 }}>vs</Text>

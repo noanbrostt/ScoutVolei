@@ -1,10 +1,11 @@
 import { View, FlatList, Alert, ScrollView, TouchableOpacity } from 'react-native';
-import { Text, FAB, Appbar, useTheme, IconButton, Surface, Avatar, Chip, Portal, Dialog, Button, Checkbox } from 'react-native-paper';
+import { Text, FAB, Appbar, useTheme, IconButton, Surface, Avatar, Chip, Portal, Dialog, Button, Checkbox, Icon } from 'react-native-paper';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { teamService } from '../../../src/services/teamService';
 import { playerService } from '../../../src/services/playerService';
 import { useAuthStore } from '../../../src/store/authStore';
+import { syncService } from '../../../src/services/syncService';
 
 const POSITIONS = ['Ponteiro', 'Central', 'Oposto', 'Levantador', 'Líbero'];
 
@@ -42,6 +43,13 @@ export default function TeamDetails() {
       loadData();
     }, [id])
   );
+
+  useEffect(() => {
+    const unsubscribe = syncService.subscribe(() => {
+      loadData();
+    });
+    return () => unsubscribe();
+  }, [id]);
 
   const filteredPlayers = useMemo(() => {
     let result = players;
@@ -150,9 +158,14 @@ export default function TeamDetails() {
                 <View className="flex-row items-center p-3">
                   {/* Info */}
                   <View className="flex-1 mr-2">
-                    <Text variant="titleMedium" style={{ fontWeight: 'bold' }} numberOfLines={1}>
-                      {item.surname || item.name.split(' ')[0]}
-                    </Text>
+                    <View className="flex-row items-center gap-2">
+                        <Text variant="titleMedium" style={{ fontWeight: 'bold' }} numberOfLines={1}>
+                        {item.surname || item.name.split(' ')[0]}
+                        </Text>
+                        {item.syncStatus === 'pending' && (
+                            <Icon source="cloud-upload" size={20} color="#F9A825" />
+                        )}
+                    </View>
                     <Text variant="bodySmall" style={{ opacity: 0.7 }} numberOfLines={1} ellipsizeMode="tail">
                       {item.name}
                     </Text>

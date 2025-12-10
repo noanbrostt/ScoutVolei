@@ -53,6 +53,7 @@ export const syncService = {
             await syncService.pullFromFirestore();
 
             console.log('Sync cycle finished successfully.');
+            syncService.notifyListeners();
         } catch (error) {
             console.error('Error during sync cycle:', error);
         }
@@ -128,44 +129,16 @@ export const syncService = {
     },
 
     syncMatchActions: async (tx: any) => {
-        // Logic to sync only finished sets/matches actions
+        // Sync all pending match actions immediately (point-by-point)
         const actionsToSync = await tx.select().from(matchActions).where(and(eq(matchActions.syncStatus, 'pending'), eq(matchActions.deleted, false)));
-        if (actionsToSync.length === 0) return;
-
-        const actionsByMatch: Record<string, typeof actionsToSync> = {};
-        actionsToSync.forEach((action: any) => {
-            if (!actionsByMatch[action.matchId]) actionsByMatch[action.matchId] = [];
-            actionsByMatch[action.matchId].push(action);
-        });
-
-        for (const matchId of Object.keys(actionsByMatch)) {
-            const match = await tx.select().from(matches).where(eq(matches.id, matchId)).get();
-            if (!match) continue;
-
-            let actionsToSend = [];
-
-            if (match.isFinished) {
-                actionsToSend = actionsByMatch[matchId];
-            } else {
-                const result = await tx.select({ maxSet: matchActions.setNumber })
-                                       .from(matchActions)
-                                       .where(eq(matchActions.matchId, matchId))
-                                       .orderBy(desc(matchActions.setNumber))
-                                       .limit(1);
-                const currentSet = result.length > 0 ? result[0].maxSet : 1;
-                actionsToSend = actionsByMatch[matchId].filter((a: any) => a.setNumber < currentSet);
-            }
-
-            if (actionsToSend.length > 0) {
-                for (const action of actionsToSend) {
-                    try {
-                        const docRef = doc(firestoreDb, 'matchActions', action.id);
-                        await setDoc(docRef, toFirestoreDoc(action), { merge: true });
-                        await markAsSynced(tx, matchActions, action.id);
-                    } catch (error) {
-                        console.error(`Failed to sync match action ${action.id}:`, error);
-                    }
-                }
+        
+        for (const action of actionsToSync) {
+            try {
+                const docRef = doc(firestoreDb, 'matchActions', action.id);
+                await setDoc(docRef, toFirestoreDoc(action), { merge: true });
+                await markAsSynced(tx, matchActions, action.id);
+            } catch (error) {
+                console.error(`Failed to sync match action ${action.id}:`, error);
             }
         }
     },
@@ -234,4 +207,18 @@ export const syncService = {
         console.log(`Starting periodic sync every ${SYNC_INTERVAL_MS / 1000} seconds.`);
         setInterval(syncService.syncAll, SYNC_INTERVAL_MS);
     },
+
+    // Event System for UI Reactivity
+    listeners: [] as (() => void)[],
+    
+    subscribe: (listener: () => void) => {
+        syncService.listeners.push(listener);
+        return () => {
+            syncService.listeners = syncService.listeners.filter(l => l !== listener);
+        };
+    },
+
+    notifyListeners: () => {
+        syncService.listeners.forEach(l => l());
+    }
 };

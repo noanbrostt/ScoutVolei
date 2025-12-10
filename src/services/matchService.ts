@@ -57,11 +57,13 @@ export const matchService = {
       const allActions = await db.select({
           matchId: matchActions.matchId,
           setNumber: matchActions.setNumber,
-          scoreChange: matchActions.scoreChange
+          scoreChange: matchActions.scoreChange,
+          syncStatus: matchActions.syncStatus
       }).from(matchActions);
 
       return matchesData.map(row => {
           const mActions = allActions.filter(a => a.matchId === row.match.id);
+          const hasPendingActions = mActions.some(a => a.syncStatus === 'pending');
           
           // Group by Set
           const setScores: Record<number, { us: number, them: number }> = {};
@@ -86,7 +88,8 @@ export const matchService = {
               ...row.match,
               teamName: row.teamName || 'Meu Time',
               setsUs,
-              setsThem
+              setsThem,
+              hasPendingData: row.match.syncStatus === 'pending' || hasPendingActions
           };
       });
   },

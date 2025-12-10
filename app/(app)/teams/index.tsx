@@ -1,10 +1,11 @@
 import { View, FlatList, RefreshControl } from 'react-native';
-import { Text, FAB, useTheme, Avatar, Card, Surface } from 'react-native-paper';
+import { Text, FAB, useTheme, Avatar, Card, Surface, Icon } from 'react-native-paper';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { teamService } from '../../../src/services/teamService';
 import { useAuthStore } from '../../../src/store/authStore';
+import { syncService } from '../../../src/services/syncService';
 
 export default function TeamsList() {
   const theme = useTheme();
@@ -30,6 +31,13 @@ export default function TeamsList() {
       loadTeams();
     }, [])
   );
+
+  useEffect(() => {
+    const unsubscribe = syncService.subscribe(() => {
+      loadTeams();
+    });
+    return () => unsubscribe();
+  }, []);
 
   const getInitials = (name: string) => {
     return name.substring(0, 2).toUpperCase();
@@ -84,9 +92,14 @@ export default function TeamsList() {
                   color="#FFF"
                 />
                 <View className="flex-1 justify-center">
-                  <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>
-                    {item.name}
-                  </Text>
+                  <View className="flex-row items-center gap-2">
+                    <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>
+                      {item.name}
+                    </Text>
+                    {item.hasPendingData && (
+                      <Icon source="cloud-upload" size={24} color="#F9A825" />
+                    )}
+                  </View>
                 </View>
                 <Avatar.Icon icon="chevron-right" size={24} style={{ backgroundColor: 'transparent' }} color={theme.colors.onSurfaceVariant} />
               </View>

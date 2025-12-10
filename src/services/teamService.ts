@@ -1,11 +1,23 @@
 import { db } from '../database/db';
 import { teams, players } from '../database/schemas';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 import * as Crypto from 'expo-crypto';
 
 export const teamService = {
   getAll: async () => {
-    return await db.select().from(teams).where(eq(teams.deleted, false)).orderBy(desc(teams.createdAt));
+    const allTeams = await db.select().from(teams).where(eq(teams.deleted, false)).orderBy(desc(teams.createdAt));
+    
+    // Get all players that are pending
+    const pendingPlayers = await db.select({ teamId: players.teamId })
+                                   .from(players)
+                                   .where(and(eq(players.syncStatus, 'pending'), eq(players.deleted, false)));
+    
+    const teamsWithPendingPlayers = new Set(pendingPlayers.map(p => p.teamId));
+
+    return allTeams.map(team => ({
+        ...team,
+        hasPendingData: team.syncStatus === 'pending' || teamsWithPendingPlayers.has(team.id)
+    }));
   },
   
   getById: async (id: string) => {
