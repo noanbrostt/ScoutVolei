@@ -47,13 +47,13 @@ export const playerService = {
 
   update: async (id: string, data: Partial<{
     name: string,
-    surname: string,
-    number: number,
+    surname: string | null,
+    number: number | null,
     position: string,
-    rg: string,
-    cpf: string,
-    birthday: string,
-    allergies: string
+    rg: string | null,
+    cpf: string | null,
+    birthday: string | null,
+    allergies: string | null
   }>) => {
     await db.update(players)
       .set({
