@@ -137,14 +137,11 @@ export default function ScoutSetup() {
         </View>
       ) : (
         <View className="flex-1">
-           <Surface className="p-4 border-b" style={{ backgroundColor: theme.colors.surfaceVariant, borderColor: theme.colors.outlineVariant }}>
-             <Text variant="bodyMedium" style={{ color: theme.colors.onSurfaceVariant }}>
-               Selecione quem começa jogando (Máx 7).
+           <View style={{ padding: 16, paddingBottom: 8 }}>
+             <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>
+               Quem começa jogando: <Text style={{ color: theme.colors.primary }}>({selectedPlayerIds.length}/7)</Text>
              </Text>
-             <Text variant="labelLarge" style={{ color: theme.colors.primary, marginTop: 4, fontWeight: 'bold' }}>
-               Selecionados: {selectedPlayerIds.length}/7
-             </Text>
-           </Surface>
+           </View>
 
            <FlatList
              data={teamPlayers}
@@ -163,7 +160,7 @@ export default function ScoutSetup() {
                    elevation={1}
                  >
                    <Checkbox.Item
-                     label={`${item.number} - ${item.surname || item.name} (${item.position})`}
+                     label={item.surname || item.name}
                      status={isSelected ? 'checked' : 'unchecked'}
                      onPress={() => togglePlayer(item.id)}
                      mode="android"
@@ -177,13 +174,14 @@ export default function ScoutSetup() {
 
            <SafeAreaView edges={['bottom']} style={{ backgroundColor: theme.colors.surface }}>
              <View className="p-4 pt-2 border-t border-gray-200">
-                            <Button 
-                              mode="contained" 
-                              onPress={handleStart} 
-                              loading={loading}
-                              disabled={selectedPlayerIds.length < 7 || loading}
-                              style={{ paddingVertical: 6 }}
-                            >                 Iniciar Partida
+                <Button 
+                  mode="contained" 
+                  onPress={handleStart} 
+                  loading={loading}
+                  disabled={selectedPlayerIds.length < 7 || loading}
+                  contentStyle={{ height: 48 }}
+                >
+                  Iniciar Partida
                </Button>
              </View>
            </SafeAreaView>
