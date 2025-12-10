@@ -32,6 +32,7 @@ export const playerService = {
       birthday: data.birthday || null,
       allergies: data.allergies || null,
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       syncStatus: 'pending' as const,
     };
     
@@ -57,6 +58,7 @@ export const playerService = {
     await db.update(players)
       .set({
         ...data,
+        updatedAt: new Date().toISOString(),
         syncStatus: 'pending'
       })
       .where(eq(players.id, id));
@@ -64,7 +66,7 @@ export const playerService = {
   
   delete: async (id: string) => {
     await db.update(players)
-      .set({ deleted: true, syncStatus: 'pending' })
+      .set({ deleted: true, updatedAt: new Date().toISOString(), syncStatus: 'pending' })
       .where(eq(players.id, id));
   }
 };

@@ -23,6 +23,7 @@ CREATE TABLE `matches` (
 	`opponent_score` integer DEFAULT 0,
 	`is_finished` integer DEFAULT false,
 	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL,
 	`sync_status` text DEFAULT 'pending' NOT NULL,
 	`deleted` integer DEFAULT false NOT NULL,
 	FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`) ON UPDATE no action ON DELETE no action
@@ -41,6 +42,7 @@ CREATE TABLE `players` (
 	`height` real,
 	`allergies` text,
 	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL,
 	`sync_status` text DEFAULT 'pending' NOT NULL,
 	`deleted` integer DEFAULT false NOT NULL,
 	FOREIGN KEY (`team_id`) REFERENCES `teams`(`id`) ON UPDATE no action ON DELETE no action

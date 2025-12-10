@@ -15,6 +15,7 @@ export const matchService = {
       opponentScore: 0,
       isFinished: false,
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       syncStatus: 'pending' as const,
     };
     await db.insert(matches).values(newMatch);
@@ -98,7 +99,7 @@ export const matchService = {
 
   delete: async (matchId: string) => {
       await db.update(matches)
-        .set({ deleted: true, syncStatus: 'pending' })
+        .set({ deleted: true, updatedAt: new Date().toISOString(), syncStatus: 'pending' })
         .where(eq(matches.id, matchId));
       // No need to cascade delete matchActions here, sync service will handle it
   },
@@ -165,6 +166,6 @@ export const matchService = {
   },
 
   finish: async (matchId: string) => {
-    await db.update(matches).set({ isFinished: true, syncStatus: 'pending' }).where(eq(matches.id, matchId));
+    await db.update(matches).set({ isFinished: true, updatedAt: new Date().toISOString(), syncStatus: 'pending' }).where(eq(matches.id, matchId));
   }
 };

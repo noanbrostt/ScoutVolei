@@ -23,6 +23,7 @@ export const players = sqliteTable('players', {
   height: real('height'),
   allergies: text('allergies'),
   createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
   syncStatus: text('sync_status').$type<'pending' | 'synced'>().default('pending').notNull(),
   deleted: integer('deleted', { mode: 'boolean' }).default(false).notNull(),
 });
@@ -37,6 +38,7 @@ export const matches = sqliteTable('matches', {
   opponentScore: integer('opponent_score').default(0),
   isFinished: integer('is_finished', { mode: 'boolean' }).default(false),
   createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
   syncStatus: text('sync_status').$type<'pending' | 'synced'>().default('pending').notNull(),
   deleted: integer('deleted', { mode: 'boolean' }).default(false).notNull(),
 });
