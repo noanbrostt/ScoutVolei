@@ -1,5 +1,5 @@
-import { View, ScrollView, FlatList, Alert } from 'react-native';
-import { TextInput, Button, Appbar, useTheme, Menu, Text, Checkbox, Divider, Chip, Surface } from 'react-native-paper';
+import { View, ScrollView, FlatList, Alert, TouchableOpacity } from 'react-native';
+import { TextInput, Button, Appbar, useTheme, Menu, Text, Checkbox, Divider, Chip, Surface, Portal, Dialog, RadioButton } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { teamService } from '../../src/services/teamService';
@@ -21,7 +21,7 @@ export default function ScoutSetup() {
   const [teamPlayers, setTeamPlayers] = useState<any[]>([]);
   const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
   
-  const [menuVisible, setMenuVisible] = useState(false);
+  const [teamModalVisible, setTeamModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -99,30 +99,16 @@ export default function ScoutSetup() {
         <View className="p-4 gap-4">
           <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>Dados do Jogo</Text>
           
-          <Menu
-            visible={menuVisible}
-            onDismiss={() => setMenuVisible(false)}
-            anchor={
-              <Button 
-                mode="outlined" 
-                onPress={() => setMenuVisible(true)}
-                contentStyle={{ justifyContent: 'flex-start', height: 56 }}
-                style={{ borderRadius: 4, borderColor: theme.colors.outline }}
-                labelStyle={{ fontSize: 16, paddingTop: 8 }} 
-                textColor={selectedTeam ? theme.colors.primary : theme.colors.onSurfaceVariant}
-              >
-                {selectedTeam ? selectedTeam.name : 'Selecionar Meu Time'}
-              </Button>
-            }
-          >
-            {teams.map(t => (
-              <Menu.Item 
-                key={t.id} 
-                onPress={() => { setSelectedTeam(t); setMenuVisible(false); }} 
-                title={t.name} 
+          <TouchableOpacity onPress={() => setTeamModalVisible(true)}>
+            <View pointerEvents="none">
+              <TextInput
+                label="Selecionar Meu Time *"
+                value={selectedTeam ? selectedTeam.name : ''}
+                mode="outlined"
+                right={<TextInput.Icon icon="menu-down" />}
               />
-            ))}
-          </Menu>
+            </View>
+          </TouchableOpacity>
 
           <TextInput
             label="Nome do Adversário *"
@@ -203,6 +189,28 @@ export default function ScoutSetup() {
            </SafeAreaView>
         </View>
       )}
+
+      <Portal>
+        <Dialog visible={teamModalVisible} onDismiss={() => setTeamModalVisible(false)} style={{ maxHeight: '80%' }}>
+          <Dialog.Title>Selecionar Time</Dialog.Title>
+          <Dialog.Content>
+            <ScrollView>
+              <RadioButton.Group onValueChange={val => {
+                const team = teams.find(t => t.id === val);
+                setSelectedTeam(team);
+                setTeamModalVisible(false);
+              }} value={selectedTeam?.id || ''}>
+                {teams.map(t => (
+                  <RadioButton.Item key={t.id} label={t.name} value={t.id} />
+                ))}
+              </RadioButton.Group>
+            </ScrollView>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setTeamModalVisible(false)}>Cancelar</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </View>
   );
 }
