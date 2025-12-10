@@ -30,7 +30,7 @@ export default function LoginScreen() {
   return (
     <View className="flex-1 justify-center items-center p-4" style={{ backgroundColor: theme.colors.background }}>
       <Text variant="headlineLarge" style={{ color: theme.colors.primary, marginBottom: 32, fontWeight: 'bold' }}>
-        Scout Vôlei
+        Blues Voleibol
       </Text>
       
       <TextInput
