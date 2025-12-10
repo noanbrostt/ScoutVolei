@@ -1,15 +1,20 @@
 {
   "expo": {
-    "name": "ScoutVolei",
+    "name": "Scout Vôlei",
     "slug": "scoutvolei",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
     },
     "android": {
-      "package": "com.seu.app"
+      "package": "com.seu.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      }
     },
     "plugins": [
       "expo-router"
