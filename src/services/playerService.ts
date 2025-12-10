@@ -5,10 +5,8 @@ import * as Crypto from 'expo-crypto';
 
 export const playerService = {
   getByTeamId: async (teamId: string) => {
-    // Order by number
     return await db.select().from(players)
-      .where(and(eq(players.teamId, teamId), eq(players.deleted, false)))
-      .orderBy(asc(players.number));
+      .where(and(eq(players.teamId, teamId), eq(players.deleted, false)));
   },
 
   create: async (data: { 
