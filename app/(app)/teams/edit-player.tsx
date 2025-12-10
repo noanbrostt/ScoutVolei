@@ -79,13 +79,13 @@ export default function EditPlayer() {
     try {
       await playerService.update(playerId, {
         name,
-        surname: surname.trim() === '' ? null : surname,
-        number: number.trim() === '' ? null : parseInt(number),
+        surname: surname.trim() === '' ? undefined : surname,
+        number: number.trim() === '' ? undefined : parseInt(number),
         position,
-        rg: rg.trim() === '' ? null : rg,
-        cpf: cpf.trim() === '' ? null : cpf,
-        birthday: birthday.trim() === '' ? null : birthday,
-        allergies: allergies.trim() === '' ? null : allergies,
+        rg: rg.trim() === '' ? undefined : rg,
+        cpf: cpf.trim() === '' ? undefined : cpf,
+        birthday: birthday.trim() === '' ? undefined : birthday,
+        allergies: allergies.trim() === '' ? undefined : allergies,
       });
       router.back();
     } catch (e) {

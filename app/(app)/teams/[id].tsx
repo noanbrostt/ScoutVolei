@@ -172,12 +172,11 @@ export default function TeamDetails() {
                     {/* Admin Player Actions */}
                     {isAdmin && (
                         <>
-                            <IconButton 
-                                icon="pencil" 
-                                size={20} 
-                                style={{ margin: 0, padding: 0 }}
-                                onPress={() => router.push({ pathname: '/(app)/teams/edit-player', params: { playerId: item.id } })} 
-                            />
+            <IconButton 
+              icon="pencil" 
+              size={20} 
+              onPress={() => router.push({ pathname: '/(app)/teams/edit-player', params: { playerId: item.id } })} 
+            />
                             <IconButton 
                                 icon="delete" 
                                 size={20} 

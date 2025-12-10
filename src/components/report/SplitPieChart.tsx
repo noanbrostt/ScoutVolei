@@ -41,7 +41,7 @@ export default function SplitPieChart({ counts, title, size = 150 }: PieChartPro
         <Text variant="labelMedium" style={{ marginBottom: 4, color: theme.colors.outline }}>{title}</Text>
         <Svg width={size} height={size}>
             <Circle cx={center} cy={center} r={radius} fill={EMPTY_COLOR} />
-            <SvgText x={center} y={center} textAnchor="middle" dominantBaseline="middle" fill="#666" fontSize="12">Sem dados</SvgText>
+            <SvgText x={center} y={center} textAnchor="middle" alignmentBaseline="middle" fill="#666" fontSize="12">Sem dados</SvgText>
         </Svg>
       </View>
     );
@@ -56,7 +56,7 @@ export default function SplitPieChart({ counts, title, size = 150 }: PieChartPro
                 <Text variant="labelMedium" style={{ marginBottom: -2, color: theme.colors.onSurface }}>{title}</Text>
                 <Svg width={size} height={size}>
                     <Circle cx={center} cy={center} r={radius} fill={PIE_COLORS[q as keyof typeof PIE_COLORS]} />
-                    <SvgText x={center} y={center} textAnchor="middle" dominantBaseline="middle" fill={textColor} fontSize="14" fontWeight="bold">
+                    <SvgText x={center} y={center} textAnchor="middle" alignmentBaseline="middle" fill={textColor} fontSize="14" fontWeight="bold">
                         {`${counts[q as keyof typeof counts]} - 100%`}
                     </SvgText>
                 </Svg>
@@ -66,7 +66,7 @@ export default function SplitPieChart({ counts, title, size = 150 }: PieChartPro
   }
 
   // Mixed Slices
-  const slices: JSX.Element[] = [];
+  const slices: React.ReactNode[] = [];
   let currentAngle = 0;
 
   // Clockwise (negatives)
@@ -80,7 +80,7 @@ export default function SplitPieChart({ counts, title, size = 150 }: PieChartPro
     slices.push(<Path key={0} d={path} fill={PIE_COLORS[0]} />);
     if (counts[0] / total > 0.05) {
         slices.push(
-            <SvgText key="t0" x={mid.x} y={mid.y} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize={10} fontWeight="bold">
+            <SvgText key="t0" x={mid.x} y={mid.y} textAnchor="middle" alignmentBaseline="middle" fill="white" fontSize={10} fontWeight="bold">
                 {`${counts[0]} - ${Math.round((counts[0]/total)*100)}%`}
             </SvgText>
         );
@@ -97,7 +97,7 @@ export default function SplitPieChart({ counts, title, size = 150 }: PieChartPro
     slices.push(<Path key={1} d={path} fill={PIE_COLORS[1]} />);
     if (counts[1] / total > 0.05) {
         slices.push(
-            <SvgText key="t1" x={mid.x} y={mid.y} textAnchor="middle" dominantBaseline="middle" fill="#333" fontSize={10} fontWeight="bold">
+            <SvgText key="t1" x={mid.x} y={mid.y} textAnchor="middle" alignmentBaseline="middle" fill="#333" fontSize={10} fontWeight="bold">
                 {`${counts[1]} - ${Math.round((counts[1]/total)*100)}%`}
             </SvgText>
         );
@@ -117,7 +117,7 @@ export default function SplitPieChart({ counts, title, size = 150 }: PieChartPro
     slices.push(<Path key={3} d={path} fill={PIE_COLORS[3]} />);
     if (counts[3] / total > 0.05) {
         slices.push(
-            <SvgText key="t3" x={mid.x} y={mid.y} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize={10} fontWeight="bold">
+            <SvgText key="t3" x={mid.x} y={mid.y} textAnchor="middle" alignmentBaseline="middle" fill="white" fontSize={10} fontWeight="bold">
                 {`${counts[3]} - ${Math.round((counts[3]/total)*100)}%`}
             </SvgText>
         );
@@ -138,7 +138,7 @@ export default function SplitPieChart({ counts, title, size = 150 }: PieChartPro
     slices.push(<Path key={2} d={path} fill={PIE_COLORS[2]} />);
     if (counts[2] / total > 0.05) {
         slices.push(
-            <SvgText key="t2" x={mid.x} y={mid.y} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize={10} fontWeight="bold">
+            <SvgText key="t2" x={mid.x} y={mid.y} textAnchor="middle" alignmentBaseline="middle" fill="white" fontSize={10} fontWeight="bold">
                 {`${counts[2]} - ${Math.round((counts[2]/total)*100)}%`}
             </SvgText>
         );

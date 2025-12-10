@@ -512,7 +512,6 @@ export default function ScoutScreen() {
                                             label={(p.surname || p.name).toUpperCase()} 
                                             value={p.id} 
                                             mode="android" 
-                                            density="compact"
                                             style={{ paddingVertical: 4 }}
                                             labelStyle={{ fontSize: 14 }}
                                         />
@@ -532,7 +531,6 @@ export default function ScoutScreen() {
                                             label={(p.surname || p.name).toUpperCase()} 
                                             value={p.id} 
                                             mode="android" 
-                                            density="compact"
                                             style={{ paddingVertical: 4 }}
                                             labelStyle={{ fontSize: 14 }}
                                         />

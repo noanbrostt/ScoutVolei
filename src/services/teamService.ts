@@ -5,7 +5,7 @@ import * as Crypto from 'expo-crypto';
 
 export const teamService = {
   getAll: async () => {
-    return await db.select().from(teams).orderBy(desc(teams.createdAt));
+    return await db.select().from(teams).where(eq(teams.deleted, false)).orderBy(desc(teams.createdAt));
   },
   
   getById: async (id: string) => {

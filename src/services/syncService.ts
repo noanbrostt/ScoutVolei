@@ -133,7 +133,7 @@ export const syncService = {
         if (actionsToSync.length === 0) return;
 
         const actionsByMatch: Record<string, typeof actionsToSync> = {};
-        actionsToSync.forEach(action => {
+        actionsToSync.forEach((action: any) => {
             if (!actionsByMatch[action.matchId]) actionsByMatch[action.matchId] = [];
             actionsByMatch[action.matchId].push(action);
         });
@@ -153,7 +153,7 @@ export const syncService = {
                                        .orderBy(desc(matchActions.setNumber))
                                        .limit(1);
                 const currentSet = result.length > 0 ? result[0].maxSet : 1;
-                actionsToSend = actionsByMatch[matchId].filter(a => a.setNumber < currentSet);
+                actionsToSend = actionsByMatch[matchId].filter((a: any) => a.setNumber < currentSet);
             }
 
             if (actionsToSend.length > 0) {

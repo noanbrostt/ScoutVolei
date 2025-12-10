@@ -60,7 +60,6 @@ export default function TeamsList() {
             <FAB
                icon="plus"
                label="Criar Novo Time"
-               extended
                onPress={() => router.push('/(app)/teams/new')}
             />
           )}

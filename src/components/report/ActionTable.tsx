@@ -5,7 +5,7 @@ import { Text, Portal, Dialog, Button, IconButton, useTheme, Surface } from 'rea
 interface ActionTableProps {
   data: {
     header: string[];
-    data: (string | JSX.Element)[][];
+    data: (string | React.ReactNode)[][];
     opponent: {
       errosAdversario: number; // Opponent Error -> Point for US
       pontosAdversario: number; // Opponent Point -> Point for THEM

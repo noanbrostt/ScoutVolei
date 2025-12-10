@@ -1,12 +1,14 @@
 import { db } from '../database/db';
 import { players } from '../database/schemas';
-import { eq, asc } from 'drizzle-orm';
+import { eq, asc, and } from 'drizzle-orm';
 import * as Crypto from 'expo-crypto';
 
 export const playerService = {
   getByTeamId: async (teamId: string) => {
     // Order by number
-    return await db.select().from(players).where(eq(players.teamId, teamId)).orderBy(asc(players.number));
+    return await db.select().from(players)
+      .where(and(eq(players.teamId, teamId), eq(players.deleted, false)))
+      .orderBy(asc(players.number));
   },
 
   create: async (data: { 

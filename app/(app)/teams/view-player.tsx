@@ -28,10 +28,10 @@ export default function ViewPlayer() {
 
   if (!player) return <View className="flex-1 bg-white" />;
 
-  const InfoRow = ({ label, value }: { label: string, value: string | number | null }) => (
+  const InfoRow = ({ label, value }: { label: string, value: string | number | null | undefined }) => (
     <View style={{ marginBottom: 16 }}>
         <Text variant="labelMedium" style={{ color: theme.colors.outline }}>{label}</Text>
-        <Text variant="bodyLarge" style={{ fontWeight: '500' }}>{value || '-'}</Text>
+        <Text variant="bodyLarge" style={{ fontWeight: '500' }}>{value != null ? String(value) : '-'}</Text>
     </View>
   );
 

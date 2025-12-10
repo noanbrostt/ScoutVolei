@@ -67,8 +67,9 @@ export const matchService = {
           
           mActions.forEach(a => {
               if (!setScores[a.setNumber]) setScores[a.setNumber] = { us: 0, them: 0 };
-              if (a.scoreChange > 0) setScores[a.setNumber].us++;
-              if (a.scoreChange < 0) setScores[a.setNumber].them++;
+              const change = a.scoreChange || 0;
+              if (change > 0) setScores[a.setNumber].us++;
+              if (change < 0) setScores[a.setNumber].them++;
           });
 
           // Calculate Sets Won
