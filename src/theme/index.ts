@@ -54,10 +54,10 @@ const CustomMD3LightThemeColors = {
 
 // --- Custom Dark Theme Colors (Derived from #0535a4) ---
 const CustomMD3DarkThemeColors = {
-  primary: '#B9C4FF',
-  onPrimary: '#00297A',
-  primaryContainer: '#003DA7',
-  onPrimaryContainer: '#DDE1FF',
+  primary: '#5C9CFF', // More vibrant "Electric Blue"
+  onPrimary: '#FFFFFF', // White text on blue buttons
+  primaryContainer: '#004ABF', // Slightly brighter container
+  onPrimaryContainer: '#FFFFFF', // White text on container
   secondary: '#BDC7DC',
   onSecondary: '#283141',
   secondaryContainer: '#3F4759',
