@@ -230,7 +230,7 @@ export default function ScoutScreen() {
           playerId: null,
           setNumber: currentSet,
           actionType,
-          quality: 0,
+          quality: type === 'our' ? 3 : 0,
           scoreChange
       });
       refreshMatch();
@@ -276,13 +276,14 @@ export default function ScoutScreen() {
         <View className="h-14 flex-row items-center px-4 justify-between bg-gray-800 border-b border-gray-700">
             {/* Substituir Button (Left) */}
             <Button 
-                mode="contained-tonal" 
+                mode="outlined" 
                 compact 
                 icon="swap-horizontal" 
                 onPress={() => setSubModalVisible(true)}
-                contentStyle={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-                labelStyle={{ fontSize: 12, marginHorizontal: 0, lineHeight: 12 }}
-                style={{ height: 36, justifyContent: 'center', paddingHorizontal: 8 }} 
+                contentStyle={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}
+                labelStyle={{ fontSize: 12, lineHeight: 12 }}
+                textColor="#E0E0E0"
+                style={{ borderColor: "#666", paddingLeft: 2, paddingRight: 4 }}
             >
                 Substituir
             </Button>
@@ -294,7 +295,7 @@ export default function ScoutScreen() {
                     compact
                     buttonColor="#1B5E20" 
                     onPress={() => handleGenericPoint('our')}
-                    labelStyle={{ fontSize: 12, marginHorizontal: 8 }} 
+                    labelStyle={{ lineHeight: 12, fontSize: 12, marginHorizontal: 8 }} 
                     textColor="#FFF" 
                 >
                     +1 NÓS
@@ -312,7 +313,7 @@ export default function ScoutScreen() {
                     compact
                     buttonColor="#B71C1C" 
                     onPress={() => handleGenericPoint('opponent')}
-                    labelStyle={{ fontSize: 12, marginHorizontal: 8 }} 
+                    labelStyle={{ lineHeight: 12, fontSize: 12, marginHorizontal: 8 }} 
                     textColor="#FFF" 
                 >
                     +1 DELES
@@ -320,14 +321,15 @@ export default function ScoutScreen() {
             </View>
             
             {/* Finish Set / Close Button (Right) */}
-             <View className="flex-row items-center gap-1">
+             <View className="flex-row items-center gap-0.5">
                 <Button
                     mode="outlined"
                     compact
                     icon="flag-checkered"
                     onPress={() => setFinishSetDialogVisible(true)}
                     textColor="#E0E0E0"
-                    style={{ borderColor: "#666" }}
+                    labelStyle={{ fontSize: 12, lineHeight: 12 }}
+                    style={{ borderColor: "#666", paddingLeft: 2, paddingRight: 4 }}
                 >
                     Fim Set
                 </Button>
