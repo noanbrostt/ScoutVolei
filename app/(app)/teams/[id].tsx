@@ -109,11 +109,11 @@ export default function TeamDetails() {
       <Appbar.Header style={{ backgroundColor: team?.color || theme.colors.primary }}>
         <Appbar.BackAction onPress={() => router.back()} color="#FFF" />
         <Appbar.Content title={team?.name || 'Detalhes'} titleStyle={{ color: '#FFF', fontWeight: 'bold' }} />
-        <Appbar.Action icon="export-variant" color="#FFF" onPress={() => router.push({ pathname: '/(app)/teams/export', params: { teamId: id } })} />
         
         {/* Admin Actions */}
         {isAdmin && (
-            <>
+          <>
+                <Appbar.Action icon="export-variant" color="#FFF" onPress={() => router.push({ pathname: '/(app)/teams/export', params: { teamId: id } })} />
                 <Appbar.Action icon="pencil" color="#FFF" onPress={() => router.push({ pathname: '/(app)/teams/edit', params: { id } })} />
                 <Appbar.Action icon="delete" color="#FFF" onPress={handleDeleteTeam} />
             </>
@@ -154,7 +154,10 @@ export default function TeamDetails() {
               }}
               elevation={1}
             >
-              <TouchableOpacity onPress={() => router.push({ pathname: '/(app)/teams/view-player', params: { playerId: item.id } })}>
+              <TouchableOpacity 
+                onPress={() => router.push({ pathname: '/(app)/teams/view-player', params: { playerId: item.id } })}
+                disabled={!isAdmin}
+              >
                 <View className="flex-row items-center p-3">
                   {/* Info */}
                   <View className="flex-1 mr-2">
@@ -166,9 +169,12 @@ export default function TeamDetails() {
                             <Icon source="cloud-upload" size={20} color="#F9A825" />
                         )}
                     </View>
-                    <Text variant="bodySmall" style={{ opacity: 0.7 }} numberOfLines={1} ellipsizeMode="tail">
-                      {item.name}
-                    </Text>
+                    {/* Show full name only if admin OR if no surname exists */}
+                    {(isAdmin) && (
+                        <Text variant="bodySmall" style={{ opacity: 0.7 }} numberOfLines={1} ellipsizeMode="tail">
+                        {item.name}
+                        </Text>
+                    )}
                   </View>
 
                   {/* Actions Row - Compact */}

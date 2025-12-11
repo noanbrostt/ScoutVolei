@@ -17,7 +17,13 @@ export default function MatchesHistory() {
   const loadMatches = async () => {
     setLoading(true);
     const data = await matchService.getAll();
-    setMatches(data);
+    
+    // Only admins can see ongoing matches
+    const filteredData = user?.role === 'admin' 
+      ? data 
+      : data.filter(m => m.isFinished);
+      
+    setMatches(filteredData);
     setLoading(false);
   };
 
@@ -164,19 +170,21 @@ export default function MatchesHistory() {
         </View>
       </SafeAreaView>
 
-      <FAB
-        icon="plus"
-        label="Novo Scout"
-        style={{
-          position: 'absolute',
-          margin: 16,
-          right: 0,
-          bottom: 0,
-          backgroundColor: theme.colors.primary
-        }}
-        color="#FFF"
-        onPress={() => router.push('/scout/setup')}
-      />
+      {user?.role === 'admin' && (
+        <FAB
+            icon="plus"
+            label="Novo Scout"
+            style={{
+            position: 'absolute',
+            margin: 16,
+            right: 0,
+            bottom: 0,
+            backgroundColor: theme.colors.primary
+            }}
+            color="#FFF"
+            onPress={() => router.push('/scout/setup')}
+        />
+      )}
     </View>
   );
 }

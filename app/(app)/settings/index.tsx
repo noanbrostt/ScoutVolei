@@ -57,8 +57,9 @@ export default function Profile() {
                 <Card.Content style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Avatar.Icon size={50} icon="account" style={{ backgroundColor: theme.colors.primaryContainer }} />
                     <View style={{ marginLeft: 16 }}>
-                        <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>{user?.name || 'Usuário'}</Text>
-                        <Text variant="bodySmall" style={{ textTransform: 'capitalize' }}>{user?.role || 'Visitante'}</Text>
+                        <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>
+                          {user?.role === 'admin' ? 'Administrador' : (user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Visitante')}
+                        </Text>
                     </View>
                 </Card.Content>
             </Card>

@@ -59,9 +59,9 @@ export default function BirthdaysScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-      <Appbar.Header elevated>
-        <Appbar.BackAction onPress={() => router.back()} />
-        <Appbar.Content title="Aniversariantes" />
+      <Appbar.Header elevated style={{ backgroundColor: theme.colors.primary }}>
+        <Appbar.BackAction onPress={() => router.back()} color="#FFFFFF" />
+        <Appbar.Content title="Aniversariantes" titleStyle={{ color: '#FFFFFF', fontWeight: 'bold' }} />
       </Appbar.Header>
 
       <View>
@@ -137,7 +137,7 @@ export default function BirthdaysScreen() {
 
                     <View style={{ flex: 1 }}>
                         <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>
-                            {item.player.name}
+                            {item.player.surname || item.player.name.split(' ')[0]}
                         </Text>
                         <Text variant="bodyMedium" style={{ color: theme.colors.primary }}>
                             {item.teamName || 'Sem Time'}
