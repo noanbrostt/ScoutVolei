@@ -178,18 +178,22 @@ const getCoords = (angleDeg: number, radius: number, center: number) => {
 };
 
 const generateSplitPieSVG = (counts: {0: number, 1: number, 2: number, 3: number}, title: string) => {
-    const size = 200;
-    const padding = 30; // Padding to avoid text clipping
+    const size = 170;
+    const padding = 10; // Padding to avoid text clipping
     const viewBoxSize = size + padding * 2;
-    const radius = 70;
+    const radius = 60;
     const center = viewBoxSize / 2;
     const total = counts[0] + counts[1] + counts[2] + counts[3];
+    
+    const hasData = total > 0;
+    const titleColor = hasData ? '#000000' : '#999999';
+    const titleWeight = hasData ? 'bold' : 'normal';
 
     // Gray empty state
     if (total === 0) {
         return `
             <svg width="${viewBoxSize}" height="${viewBoxSize}" viewBox="0 0 ${viewBoxSize} ${viewBoxSize}">
-                <text x="${center}" y="20" text-anchor="middle" font-size="12" fill="#666" font-family="Helvetica">${title}</text>
+                <text x="${center}" y="20" text-anchor="middle" font-size="12" fill="${titleColor}" font-weight="${titleWeight}" font-family="Helvetica">${title}</text>
                 <circle cx="${center}" cy="${center}" r="${radius}" fill="${COLORS.empty}" />
                 <text x="${center}" y="${center}" text-anchor="middle" dominant-baseline="middle" fill="#666" font-size="14" font-family="Helvetica">Sem dados</text>
             </svg>
@@ -202,7 +206,7 @@ const generateSplitPieSVG = (counts: {0: number, 1: number, 2: number, 3: number
              const textColor = (q === 1) ? '#333' : 'white';
              return `
                 <svg width="${viewBoxSize}" height="${viewBoxSize}" viewBox="0 0 ${viewBoxSize} ${viewBoxSize}">
-                    <text x="${center}" y="20" text-anchor="middle" font-size="12" fill="#666" font-family="Helvetica">${title}</text>
+                    <text x="${center}" y="20" text-anchor="middle" font-size="12" fill="${titleColor}" font-weight="${titleWeight}" font-family="Helvetica">${title}</text>
                     
                     <!-- Full Solid Circle (No donut hole) -->
                     <circle cx="${center}" cy="${center}" r="${radius}" fill="${PIE_COLORS[q as keyof typeof PIE_COLORS]}" stroke="white" stroke-width="1" />
@@ -301,7 +305,7 @@ const generateSplitPieSVG = (counts: {0: number, 1: number, 2: number, 3: number
 
     return `
         <svg width="${viewBoxSize}" height="${viewBoxSize}" viewBox="0 0 ${viewBoxSize} ${viewBoxSize}">
-            <text x="${center}" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="#333" font-family="Helvetica">${title}</text>
+            <text x="${center}" y="20" text-anchor="middle" font-size="12" font-weight="${titleWeight}" fill="${titleColor}" font-family="Helvetica">${title}</text>
             ${pathsSVG}
             ${labelsSVG}
         </svg>
@@ -477,12 +481,12 @@ const generateHTML = (sectionsHTML: string) => {
           
           /* Page Container for centering */
           .report-page { 
-              height: 100vh; 
+              min-height: 100vh; 
               width: 100%;
               display: flex; 
               flex-direction: column; 
-              justify-content: center; 
-              padding: 40px; 
+              justify-content: center;
+              padding: 20px 30px; 
               box-sizing: border-box; 
               page-break-after: always;
           }
@@ -503,18 +507,18 @@ const generateHTML = (sectionsHTML: string) => {
           p { font-size: 12px; margin: 5px 0; }
 
           /* Report Content Styles */
-          .section-title { font-size: 22px; font-weight: bold; margin-bottom: 30px; border-bottom: 2px solid ${COLORS.primary}; padding-bottom: 5px; text-transform: uppercase; text-align: center; }
+          .section-title { font-size: 22px; font-weight: bold; margin-bottom: 20px; border-bottom: 2px solid ${COLORS.primary}; padding-bottom: 5px; text-transform: uppercase; text-align: center; }
           
-          .charts-container { display: flex; flex-direction: row; justify-content: space-around; align-items: center; margin-bottom: 30px; }
+          .charts-container { display: flex; flex-direction: row; justify-content: space-around; align-items: center; margin-bottom: 20px; }
           .chart-box { text-align: center; }
           
           table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+          th, td { border: 1px solid #ddd; padding: 6px; text-align: center; }
           th { background-color: #f9f9f9; color: #333; font-weight: bold; }
           .row-label { font-weight: bold; text-align: left; }
           
-          .pies-grid { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: space-between; row-gap: 20px; margin-top: 20px; }
-          .pie-box { width: 32%; display: flex; justify-content: center; } 
+          .pies-grid { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: space-between; row-gap: 2px; margin-top: 10px; }
+          .pie-box { width: 32%; display: flex; justify-content: center; margin-bottom: 2px; } 
         </style>
       </head>
       <body>
@@ -531,14 +535,45 @@ const generateSectionHTML = (title: string, actions: MatchAction[]) => {
     const radarSVG = generateRadarSVG(stats.radar, stats.bar);
     const barSVG = generateBarSVG(stats.bar);
 
-    let piesHTML = '';
-    piesHTML += `<div class="pie-box">${generateSplitPieSVG(stats.scoringCounts, 'Total Scoring Skills')}</div>`;
-    piesHTML += `<div class="pie-box">${generateSplitPieSVG(stats.nonScoringCounts, 'Total Non-Scoring Skills')}</div>`;
-    piesHTML += `<div class="pie-box">${generateSplitPieSVG(stats.totalCounts, 'Total de Ações')}</div>`;
-    
-    stats.pieChartsData.forEach(row => {
-        piesHTML += `<div class="pie-box">${generateSplitPieSVG(row.counts, row.label)}</div>`;
+    const findPie = (lbl: string) => stats.pieChartsData.find(d => d.label === lbl);
+
+    const generateRow = (charts: string[], justify: string = 'space-between') => {
+        return `<div style="display:flex; flex-direction:row; width:100%; justify-content:${justify}; margin-bottom:5px;">${charts.join('')}</div>`;
+    };
+
+    // Row 1: Saque, Ataque, Bloqueio
+    const row1 = ['Saque', 'Ataque', 'Bloqueio'].map(lbl => {
+        const data = findPie(lbl);
+        return data ? `<div class="pie-box">${generateSplitPieSVG(data.counts, lbl)}</div>` : '';
     });
+
+    // Row 2: Passe, Defesa, Levantamento
+    const row2 = ['Passe', 'Defesa', 'Levantamento'].map(lbl => {
+        const data = findPie(lbl);
+        return data ? `<div class="pie-box">${generateSplitPieSVG(data.counts, lbl)}</div>` : '';
+    });
+
+    // Row 3: Atk, C. Atk (space-evenly)
+    const row3 = ['Atk', 'C. Atk'].map(lbl => {
+        const data = findPie(lbl);
+        return data ? `<div class="pie-box">${generateSplitPieSVG(data.counts, lbl)}</div>` : '';
+    });
+
+    // Row 4: Scoring, Non-Scoring, Total
+    const row4 = [
+        `<div class="pie-box">${generateSplitPieSVG(stats.scoringCounts, 'Total Scoring Skills')}</div>`,
+        `<div class="pie-box">${generateSplitPieSVG(stats.nonScoringCounts, 'Total Non-Scoring Skills')}</div>`,
+        `<div class="pie-box">${generateSplitPieSVG(stats.totalCounts, 'Total')}</div>`
+    ];
+
+    const piesHTML = `
+        <div style="display:flex; flex-direction:column; width:100%;">
+            ${generateRow(row1)}
+            ${generateRow(row2)}
+            ${generateRow(row3, 'space-evenly')}
+            ${generateRow(row4)}
+        </div>
+    `;
 
     let tableRows = '';
     stats.tableData.forEach(row => {

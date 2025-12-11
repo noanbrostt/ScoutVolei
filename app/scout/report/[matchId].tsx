@@ -274,10 +274,20 @@ export default function MatchReportScreen() {
                     <Divider style={{ marginVertical: 20, marginHorizontal: 16 }} />
                     <Text variant="titleMedium" style={{ fontWeight: 'bold', color: theme.colors.onSurface, textAlign: 'center', marginBottom: 20 }}>Distribuição de Qualidade</Text>
                     <View style={styles.piesGrid}>
-                        <SplitPieChart counts={scoringCounts} title="Total Scoring Skills" />
-                        <SplitPieChart counts={nonScoringCounts} title="Total Non-Scoring Skills" />
-                        <SplitPieChart counts={totalCounts} title="Total de Ações" />
-                        {pieChartsData.map(d => <SplitPieChart key={d.label} counts={d.counts} title={d.label} />)}
+                        {['Saque', 'Ataque', 'Bloqueio', 'Passe', 'Defesa', 'Levantamento'].map(lbl => {
+                            const d = pieChartsData.find(x => x.label === lbl);
+                            return d ? <SplitPieChart key={lbl} counts={d.counts} title={lbl} size={115} /> : null;
+                        })}
+                        
+                        {['Atk', 'C. Atk'].map(lbl => {
+                            const d = pieChartsData.find(x => x.label === lbl);
+                            return d ? <SplitPieChart key={lbl} counts={d.counts} title={lbl} size={115} /> : null;
+                        })}
+                        
+                        <SplitPieChart counts={scoringCounts} title="Total Scoring Skills" size={115} />
+                        <SplitPieChart counts={nonScoringCounts} title="Total Non-Scoring Skills" size={115} />
+                        
+                        <SplitPieChart counts={totalCounts} title="Total" size={115} />
                     </View>
                  </>
              ) : (
