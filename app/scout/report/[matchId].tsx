@@ -145,14 +145,17 @@ export default function MatchReportScreen() {
     });
 
     [{l: 'Atk', d: sOut}, {l: 'C. Atk', d: cAtk}].forEach(item => {
+        const total = item.d.length;
         const counts = {
             0: item.d.filter(a => a.quality === 0).length,
             1: item.d.filter(a => a.quality === 1).length,
             2: item.d.filter(a => a.quality === 2).length,
             3: item.d.filter(a => a.quality === 3).length,
         };
-        tblData.push({ label: item.l, counts, total: item.d.length, percentages: [] });
-        pieData.push({ label: item.l, counts, total: item.d.length });
+        const percentages = qualities.map(q => total > 0 ? ((counts[q] / total) * 100).toFixed(1) + '%' : '0%');
+        
+        tblData.push({ label: item.l, counts, total, percentages });
+        pieData.push({ label: item.l, counts, total });
     });
 
     // Aggregates for Pie Charts
