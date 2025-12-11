@@ -11,6 +11,7 @@ Com o ScoutVôlei, você pode ir além da simples observação, transformando da
 *   **Scouting Detalhado de Partidas:** Registre todas as ações de jogo, pontuações e eventos cruciais em tempo real, capturando cada detalhe da partida.
 *   **Gerenciamento Completo de Equipes e Jogadores:** Mantenha um cadastro organizado de suas equipes e atletas, com informações detalhadas que facilitam a gestão e o acompanhamento individual.
 *   **Acompanhamento em Tempo Real:** Monitore o progresso das partidas, incluindo pontuações por set e resultados finais, com uma interface clara e responsiva.
+*   **Aniversariantes do Mês:** Visualize facilmente quais atletas de todos os seus times fazem aniversário no mês selecionado.
 *   **Relatórios Visuais e Analíticos:** Gere relatórios ricos em gráficos e tabelas, oferecendo uma análise aprofundada do desempenho de equipes e jogadores. Transforme números em visualizações compreensíveis para tomadas de decisão estratégicas.
 *   **Sincronização de Dados Robusta:** Seus dados são seguros! Sincronize informações armazenadas localmente com um serviço em nuvem (Firebase), garantindo persistência, acessibilidade e backup confiável.
 *   **Experiência Personalizável:** Escolha entre temas claro e escuro para uma experiência de usuário confortável em qualquer ambiente.
