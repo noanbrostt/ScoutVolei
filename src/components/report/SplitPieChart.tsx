@@ -30,16 +30,21 @@ const getCoords = (angleDeg: number, radius: number, center: number) => {
 
 export default function SplitPieChart({ counts, title, size = 150 }: PieChartProps) {
   const theme = useTheme();
-  const radius = size * 0.4;
-  const center = size / 2;
+  
+  // Add padding to avoid clipping text
+  const padding = 20;
+  const viewBoxSize = size + padding * 2;
+  const center = viewBoxSize / 2;
+  const radius = size * 0.4; // Radius relative to original size intent
+  
   const total = counts[0] + counts[1] + counts[2] + counts[3];
 
   // No data state
   if (total === 0) {
     return (
-      <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+      <View style={{ width: viewBoxSize, height: viewBoxSize, alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
         <Text variant="labelMedium" style={{ marginBottom: 4, color: theme.colors.outline }}>{title}</Text>
-        <Svg width={size} height={size}>
+        <Svg width={viewBoxSize} height={viewBoxSize}>
             <Circle cx={center} cy={center} r={radius} fill={EMPTY_COLOR} />
             <SvgText x={center} y={center} textAnchor="middle" alignmentBaseline="middle" fill="#666" fontSize="12">Sem dados</SvgText>
         </Svg>
@@ -52,9 +57,9 @@ export default function SplitPieChart({ counts, title, size = 150 }: PieChartPro
     if (counts[q as keyof typeof counts] === total) {
         const textColor = (q === 1) ? '#333' : 'white';
         return (
-            <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+            <View style={{ width: viewBoxSize, height: viewBoxSize, alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
                 <Text variant="labelMedium" style={{ marginBottom: -2, color: theme.colors.onSurface }}>{title}</Text>
-                <Svg width={size} height={size}>
+                <Svg width={viewBoxSize} height={viewBoxSize}>
                     <Circle cx={center} cy={center} r={radius} fill={PIE_COLORS[q as keyof typeof PIE_COLORS]} />
                     <SvgText x={center} y={center} textAnchor="middle" alignmentBaseline="middle" fill={textColor} fontSize="14" fontWeight="bold">
                         {`${counts[q as keyof typeof counts]} - 100%`}
@@ -66,7 +71,8 @@ export default function SplitPieChart({ counts, title, size = 150 }: PieChartPro
   }
 
   // Mixed Slices
-  const slices: React.ReactNode[] = [];
+  const paths: React.ReactNode[] = [];
+  const labels: React.ReactNode[] = [];
   let currentAngle = 0;
 
   // Clockwise (negatives)
@@ -77,10 +83,10 @@ export default function SplitPieChart({ counts, title, size = 150 }: PieChartPro
     const mid = getCoords(currentAngle + deg / 2, radius * 0.65, center);
     const path = `M ${center},${center} L ${start.x},${start.y} A ${radius},${radius} 0 ${deg > 180 ? 1 : 0},1 ${end.x},${end.y} Z`;
     
-    slices.push(<Path key={0} d={path} fill={PIE_COLORS[0]} />);
+    paths.push(<Path key={0} d={path} fill={PIE_COLORS[0]} />);
     if (counts[0] / total > 0.05) {
-        slices.push(
-            <SvgText key="t0" x={mid.x} y={mid.y} textAnchor="middle" alignmentBaseline="middle" fill="white" fontSize={10} fontWeight="bold">
+        labels.push(
+            <SvgText key="t0" x={mid.x + 2} y={mid.y} textAnchor="middle" alignmentBaseline="middle" fill="white" fontSize={10} fontWeight="bold">
                 {`${counts[0]} - ${Math.round((counts[0]/total)*100)}%`}
             </SvgText>
         );
@@ -94,10 +100,10 @@ export default function SplitPieChart({ counts, title, size = 150 }: PieChartPro
     const mid = getCoords(currentAngle + deg / 2, radius * 0.65, center);
     const path = `M ${center},${center} L ${start.x},${start.y} A ${radius},${radius} 0 ${deg > 180 ? 1 : 0},1 ${end.x},${end.y} Z`;
 
-    slices.push(<Path key={1} d={path} fill={PIE_COLORS[1]} />);
+    paths.push(<Path key={1} d={path} fill={PIE_COLORS[1]} />);
     if (counts[1] / total > 0.05) {
-        slices.push(
-            <SvgText key="t1" x={mid.x} y={mid.y} textAnchor="middle" alignmentBaseline="middle" fill="#333" fontSize={10} fontWeight="bold">
+        labels.push(
+            <SvgText key="t1" x={mid.x + 2} y={mid.y} textAnchor="middle" alignmentBaseline="middle" fill="#333" fontSize={10} fontWeight="bold">
                 {`${counts[1]} - ${Math.round((counts[1]/total)*100)}%`}
             </SvgText>
         );
@@ -114,10 +120,10 @@ export default function SplitPieChart({ counts, title, size = 150 }: PieChartPro
     const mid = getCoords(startAngle + deg / 2, radius * 0.65, center);
     const path = `M ${center},${center} L ${start.x},${start.y} A ${radius},${radius} 0 ${deg > 180 ? 1 : 0},1 ${end.x},${end.y} Z`;
 
-    slices.push(<Path key={3} d={path} fill={PIE_COLORS[3]} />);
+    paths.push(<Path key={3} d={path} fill={PIE_COLORS[3]} />);
     if (counts[3] / total > 0.05) {
-        slices.push(
-            <SvgText key="t3" x={mid.x} y={mid.y} textAnchor="middle" alignmentBaseline="middle" fill="white" fontSize={10} fontWeight="bold">
+        labels.push(
+            <SvgText key="t3" x={mid.x + 2} y={mid.y} textAnchor="middle" alignmentBaseline="middle" fill="white" fontSize={10} fontWeight="bold">
                 {`${counts[3]} - ${Math.round((counts[3]/total)*100)}%`}
             </SvgText>
         );
@@ -135,10 +141,10 @@ export default function SplitPieChart({ counts, title, size = 150 }: PieChartPro
     const mid = getCoords(startAngle + deg / 2, radius * 0.65, center);
     const path = `M ${center},${center} L ${start.x},${start.y} A ${radius},${radius} 0 ${deg > 180 ? 1 : 0},1 ${end.x},${end.y} Z`;
 
-    slices.push(<Path key={2} d={path} fill={PIE_COLORS[2]} />);
+    paths.push(<Path key={2} d={path} fill={PIE_COLORS[2]} />);
     if (counts[2] / total > 0.05) {
-        slices.push(
-            <SvgText key="t2" x={mid.x} y={mid.y} textAnchor="middle" alignmentBaseline="middle" fill="white" fontSize={10} fontWeight="bold">
+        labels.push(
+            <SvgText key="t2" x={mid.x + 2} y={mid.y} textAnchor="middle" alignmentBaseline="middle" fill="white" fontSize={10} fontWeight="bold">
                 {`${counts[2]} - ${Math.round((counts[2]/total)*100)}%`}
             </SvgText>
         );
@@ -146,10 +152,11 @@ export default function SplitPieChart({ counts, title, size = 150 }: PieChartPro
   }
 
   return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+    <View style={{ width: viewBoxSize, height: viewBoxSize, alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
         <Text variant="labelMedium" style={{ marginBottom: -2, color: theme.colors.onSurface }}>{title}</Text>
-        <Svg width={size} height={size}>
-            {slices}
+        <Svg width={viewBoxSize} height={viewBoxSize}>
+            {paths}
+            {labels}
         </Svg>
     </View>
   );

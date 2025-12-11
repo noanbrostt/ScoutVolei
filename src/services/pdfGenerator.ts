@@ -179,14 +179,16 @@ const getCoords = (angleDeg: number, radius: number, center: number) => {
 
 const generateSplitPieSVG = (counts: {0: number, 1: number, 2: number, 3: number}, title: string) => {
     const size = 200;
+    const padding = 30; // Padding to avoid text clipping
+    const viewBoxSize = size + padding * 2;
     const radius = 70;
-    const center = size / 2;
+    const center = viewBoxSize / 2;
     const total = counts[0] + counts[1] + counts[2] + counts[3];
 
     // Gray empty state
     if (total === 0) {
         return `
-            <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+            <svg width="${viewBoxSize}" height="${viewBoxSize}" viewBox="0 0 ${viewBoxSize} ${viewBoxSize}">
                 <text x="${center}" y="20" text-anchor="middle" font-size="12" fill="#666" font-family="Helvetica">${title}</text>
                 <circle cx="${center}" cy="${center}" r="${radius}" fill="${COLORS.empty}" />
                 <text x="${center}" y="${center}" text-anchor="middle" dominant-baseline="middle" fill="#666" font-size="14" font-family="Helvetica">Sem dados</text>
@@ -199,7 +201,7 @@ const generateSplitPieSVG = (counts: {0: number, 1: number, 2: number, 3: number
         if (counts[q as keyof typeof counts] === total) {
              const textColor = (q === 1) ? '#333' : 'white';
              return `
-                <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+                <svg width="${viewBoxSize}" height="${viewBoxSize}" viewBox="0 0 ${viewBoxSize} ${viewBoxSize}">
                     <text x="${center}" y="20" text-anchor="middle" font-size="12" fill="#666" font-family="Helvetica">${title}</text>
                     
                     <!-- Full Solid Circle (No donut hole) -->
@@ -212,10 +214,11 @@ const generateSplitPieSVG = (counts: {0: number, 1: number, 2: number, 3: number
         }
     }
 
-    let svgContent = '';
+    let pathsSVG = '';
+    let labelsSVG = '';
     let currentAngle = 0; 
     
-    // 0 - Error (Red)
+    // 0 - Error (Red) - Clockwise
     if (counts[0] > 0) {
         const deg = (counts[0] / total) * 360;
         const start = getCoords(currentAngle, radius, center);
@@ -223,16 +226,17 @@ const generateSplitPieSVG = (counts: {0: number, 1: number, 2: number, 3: number
         const mid = getCoords(currentAngle + (deg/2), radius * 0.65, center);
         const largeArc = deg > 180 ? 1 : 0;
         
-        svgContent += `<path d="M ${center} ${center} L ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y} Z" fill="${PIE_COLORS[0]}" stroke="white" stroke-width="1" />`;
+        pathsSVG += `<path d="M ${center} ${center} L ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y} Z" fill="${PIE_COLORS[0]}" stroke="white" stroke-width="1" />`;
         
-        if (counts[0] / total > 0.05) {
+        if (counts[0] / total > 0.04) {
             const pct = Math.round((counts[0]/total)*100);
-            svgContent += `<text x="${mid.x}" y="${mid.y}" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="10" font-weight="bold">${counts[0]} - ${pct}%</text>`;
+            // Added +2 to X coordinate
+            labelsSVG += `<text x="${mid.x + 2}" y="${mid.y}" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="10" font-weight="bold">${counts[0]} - ${pct}%</text>`;
         }
         currentAngle += deg;
     }
 
-    // 1 - Poor (Yellow)
+    // 1 - Poor (Yellow) - Clockwise
     if (counts[1] > 0) {
         const deg = (counts[1] / total) * 360;
         const start = getCoords(currentAngle, radius, center);
@@ -240,18 +244,19 @@ const generateSplitPieSVG = (counts: {0: number, 1: number, 2: number, 3: number
         const mid = getCoords(currentAngle + (deg/2), radius * 0.65, center);
         const largeArc = deg > 180 ? 1 : 0;
         
-        svgContent += `<path d="M ${center} ${center} L ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y} Z" fill="${PIE_COLORS[1]}" stroke="white" stroke-width="1" />`;
+        pathsSVG += `<path d="M ${center} ${center} L ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y} Z" fill="${PIE_COLORS[1]}" stroke="white" stroke-width="1" />`;
         
-        if (counts[1] / total > 0.05) {
+        if (counts[1] / total > 0.04) {
             const pct = Math.round((counts[1]/total)*100);
-            svgContent += `<text x="${mid.x}" y="${mid.y}" text-anchor="middle" dominant-baseline="middle" fill="#333" font-size="10" font-weight="bold">${counts[1]} - ${pct}%</text>`;
+            // Added +2 to X coordinate
+            labelsSVG += `<text x="${mid.x + 2}" y="${mid.y}" text-anchor="middle" dominant-baseline="middle" fill="#333" font-size="10" font-weight="bold">${counts[1]} - ${pct}%</text>`;
         }
         currentAngle += deg;
     }
 
     currentAngle = 0;
 
-    // 3 - Perfect (Dark Green)
+    // 3 - Perfect (Dark Green) - Counter-Clockwise
     if (counts[3] > 0) {
         const deg = (counts[3] / total) * 360;
         const startAngle = 360 - deg;
@@ -262,18 +267,19 @@ const generateSplitPieSVG = (counts: {0: number, 1: number, 2: number, 3: number
         const mid = getCoords(startAngle + (deg/2), radius * 0.65, center);
         const largeArc = deg > 180 ? 1 : 0;
 
-        svgContent += `<path d="M ${center} ${center} L ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y} Z" fill="${PIE_COLORS[3]}" stroke="white" stroke-width="1" />`;
+        pathsSVG += `<path d="M ${center} ${center} L ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y} Z" fill="${PIE_COLORS[3]}" stroke="white" stroke-width="1" />`;
         
-        if (counts[3] / total > 0.05) {
+        if (counts[3] / total > 0.04) {
             const pct = Math.round((counts[3]/total)*100);
-            svgContent += `<text x="${mid.x}" y="${mid.y}" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="10" font-weight="bold">${counts[3]} - ${pct}%</text>`;
+            // Added +2 to X coordinate
+            labelsSVG += `<text x="${mid.x + 2}" y="${mid.y}" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="10" font-weight="bold">${counts[3]} - ${pct}%</text>`;
         }
         currentAngle = startAngle;
     } else {
         currentAngle = 360;
     }
 
-    // 2 - Good (Light Green)
+    // 2 - Good (Light Green) - Counter-Clockwise
     if (counts[2] > 0) {
         const deg = (counts[2] / total) * 360;
         const startAngle = currentAngle - deg;
@@ -284,18 +290,20 @@ const generateSplitPieSVG = (counts: {0: number, 1: number, 2: number, 3: number
         const mid = getCoords(startAngle + (deg/2), radius * 0.65, center);
         const largeArc = deg > 180 ? 1 : 0;
 
-        svgContent += `<path d="M ${center} ${center} L ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y} Z" fill="${PIE_COLORS[2]}" stroke="white" stroke-width="1" />`;
+        pathsSVG += `<path d="M ${center} ${center} L ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y} Z" fill="${PIE_COLORS[2]}" stroke="white" stroke-width="1" />`;
         
-        if (counts[2] / total > 0.05) {
+        if (counts[2] / total > 0.04) {
             const pct = Math.round((counts[2]/total)*100);
-            svgContent += `<text x="${mid.x}" y="${mid.y}" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="10" font-weight="bold">${counts[2]} - ${pct}%</text>`;
+            // Added +2 to X coordinate
+            labelsSVG += `<text x="${mid.x + 2}" y="${mid.y}" text-anchor="middle" dominant-baseline="middle" fill="white" font-size="10" font-weight="bold">${counts[2]} - ${pct}%</text>`;
         }
     }
 
     return `
-        <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+        <svg width="${viewBoxSize}" height="${viewBoxSize}" viewBox="0 0 ${viewBoxSize} ${viewBoxSize}">
             <text x="${center}" y="20" text-anchor="middle" font-size="12" font-weight="bold" fill="#333" font-family="Helvetica">${title}</text>
-            ${svgContent}
+            ${pathsSVG}
+            ${labelsSVG}
         </svg>
     `;
 };
