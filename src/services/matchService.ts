@@ -1,6 +1,6 @@
 import { db } from '../database/db';
 import { matches, matchActions, teams } from '../database/schemas';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 import * as Crypto from 'expo-crypto';
 
 export const matchService = {
@@ -59,7 +59,7 @@ export const matchService = {
           setNumber: matchActions.setNumber,
           scoreChange: matchActions.scoreChange,
           syncStatus: matchActions.syncStatus
-      }).from(matchActions);
+      }).from(matchActions).where(eq(matchActions.deleted, false));
 
       return matchesData.map(row => {
           const mActions = allActions.filter(a => a.matchId === row.match.id);
@@ -96,7 +96,7 @@ export const matchService = {
 
   getActions: async (matchId: string) => {
     return await db.select().from(matchActions)
-      .where(eq(matchActions.matchId, matchId))
+      .where(and(eq(matchActions.matchId, matchId), eq(matchActions.deleted, false)))
       .orderBy(desc(matchActions.timestamp));
   },
 
