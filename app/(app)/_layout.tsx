@@ -35,7 +35,7 @@ export default function AppLayout() {
         }}
       />
       <Tabs.Screen
-        name="profile"
+        name="settings"
         options={{
           title: 'Configurações',
           tabBarLabel: 'Configurações',

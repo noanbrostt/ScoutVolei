@@ -2,9 +2,9 @@ import { View, Alert } from 'react-native';
 import { Text, Button, List, Switch, useTheme, Divider, Card, Avatar, ActivityIndicator } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useThemeStore } from '../../src/store/themeStore';
-import { useAuthStore } from '../../src/store/authStore';
-import { syncService } from '../../src/services/syncService';
+import { useThemeStore } from '../../../src/store/themeStore';
+import { useAuthStore } from '../../../src/store/authStore';
+import { syncService } from '../../../src/services/syncService';
 import { useState } from 'react';
 
 export default function Profile() {
@@ -74,6 +74,15 @@ export default function Profile() {
                     description="Alternar entre tema claro e escuro"
                     left={props => <List.Icon {...props} icon="theme-light-dark" />}
                     right={() => <Switch value={isDarkMode} onValueChange={toggleTheme} />}
+                />
+            </Card>
+
+            <Card mode="outlined" style={{ marginBottom: 12, backgroundColor: 'transparent', borderColor: theme.colors.outlineVariant }}>
+                <List.Item
+                    title="Aniversariantes do Mês"
+                    description="Veja quem faz aniversário por mês"
+                    left={props => <List.Icon {...props} icon="cake-variant" />}
+                    onPress={() => router.push('/(app)/settings/birthdays')}
                 />
             </Card>
 
