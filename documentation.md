@@ -110,6 +110,11 @@ Esta seção detalha as principais funcionalidades e como elas são implementada
     *   As telas sob `app/scout/setup.tsx` e `app/scout/[matchId]/index.tsx` são usadas para configurar uma partida e registrar as ações de jogo em tempo real.
     *   **Interface de Scouting:** A tela `app/scout/[matchId]/index.tsx` é forçada para o modo **Paisagem (Landscape)** para otimizar o espaço. Ela apresenta uma lista vertical de jogadores à esquerda, um log de ações recentes ao centro e uma matriz de botões (Ação vs Qualidade) à direita.
     *   **Lógica de Registro:** O sistema permite um fluxo rápido de "dois cliques". O usuário pode selecionar *Jogador -> Ação* ou *Ação -> Jogador* indistintamente para registrar um evento.
+    *   **Funcionalidades Adicionais:**
+        *   **Desfazer Ação:** Botão na barra superior permite remover a última ação registrada mediante confirmação.
+        *   **Substituição Múltipla:** Permite selecionar múltiplos jogadores para entrar e sair simultaneamente, validando a permanência de 6 ou 7 atletas em quadra.
+        *   **Edição de Partida:** Possibilidade de alterar o nome do adversário e o local da partida tanto na tela de scout quanto no relatório.
+        *   **Escalação Flexível:** Permite iniciar partidas e manter times com 6 ou 7 jogadores.
 
 ### Aniversariantes do Mês:
 
