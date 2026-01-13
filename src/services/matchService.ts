@@ -40,6 +40,16 @@ export const matchService = {
     return null;
   },
 
+  update: async (matchId: string, data: { opponentName?: string, location?: string }) => {
+    await db.update(matches)
+      .set({ 
+        ...data, 
+        updatedAt: new Date().toISOString(), 
+        syncStatus: 'pending' 
+      })
+      .where(eq(matches.id, matchId));
+  },
+
   getAll: async () => {
       // Fetch matches joined with team name
       const matchesData = await db.select({

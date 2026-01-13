@@ -54,14 +54,6 @@ export default function ScoutSetup() {
     }
   };
 
-  const handleNext = () => {
-    if (!selectedTeam || !opponent.trim()) {
-      Alert.alert('Atenção', 'Selecione um time e informe o adversário.');
-      return;
-    }
-    setStep(2);
-  };
-
   const handleStart = async () => {
     if (selectedPlayerIds.length < 7) {
       Alert.alert('Atenção', 'Selecione exatamente 7 atletas (6 Titulares + 1 Líbero) para iniciar.');
@@ -71,7 +63,7 @@ export default function ScoutSetup() {
     setLoading(true);
     try {
       // Create match
-      const match = await matchService.create(selectedTeam.id, opponent, location);
+      const match = await matchService.create(selectedTeam.id, opponent.trim() || 'Adversário', location);
       
       // Pass selected players to the scout screen via params
       router.replace({
@@ -111,14 +103,14 @@ export default function ScoutSetup() {
           </TouchableOpacity>
 
           <TextInput
-            label="Nome do Adversário *"
+            label="Nome do Adversário"
             value={opponent}
             onChangeText={setOpponent}
             mode="outlined"
           />
           
           <TextInput
-            label="Local (Ginásio/Cidade)"
+            label="Local (Ginásio/Campeonato)"
             value={location}
             onChangeText={setLocation}
             mode="outlined"
@@ -128,8 +120,14 @@ export default function ScoutSetup() {
           
           <Button 
             mode="contained" 
-            onPress={handleNext} 
-            disabled={!selectedTeam || !opponent.trim()}
+            onPress={() => {
+              if (!selectedTeam) {
+                Alert.alert('Atenção', 'Selecione um time.');
+                return;
+              }
+              setStep(2);
+            }} 
+            disabled={!selectedTeam}
             style={{ paddingVertical: 6 }}
           >
             Próximo: Escalação

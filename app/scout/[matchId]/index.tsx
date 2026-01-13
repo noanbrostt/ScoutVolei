@@ -1,5 +1,5 @@
 import { View, StatusBar, Platform, ScrollView, FlatList, Alert } from 'react-native';
-import { Text, Button, IconButton, useTheme, Portal, Dialog, RadioButton, Surface, TouchableRipple } from 'react-native-paper';
+import { Text, Button, IconButton, useTheme, Portal, Dialog, RadioButton, Surface, TouchableRipple, TextInput } from 'react-native-paper';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useState, useEffect, useCallback } from 'react';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -56,6 +56,11 @@ export default function ScoutScreen() {
   // Finish Set / Match State
   const [finishSetDialogVisible, setFinishSetDialogVisible] = useState(false);
 
+  // Edit Match State
+  const [editMatchDialogVisible, setEditMatchDialogVisible] = useState(false);
+  const [editOpponent, setEditOpponent] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+
   useFocusEffect(
     useCallback(() => {
       // Force Landscape & Immersive Mode
@@ -83,6 +88,9 @@ export default function ScoutScreen() {
   const loadData = async (id: string) => {
       const m = await matchService.getById(id);
       setMatch(m);
+      setEditOpponent(m?.opponentName || '');
+      setEditLocation(m?.location || '');
+      
       if (m) {
           const p = await playerService.getByTeamId(m.teamId);
           setAllPlayers(p);
@@ -135,6 +143,16 @@ export default function ScoutScreen() {
       if (!match) return;
       await matchService.finish(match.id);
       router.replace('/(app)/history');
+  };
+
+  const handleEditMatch = async () => {
+      if (!match) return;
+      await matchService.update(match.id, {
+          opponentName: editOpponent,
+          location: editLocation
+      });
+      setEditMatchDialogVisible(false);
+      refreshMatch();
   };
 
   const sortActivePlayers = (players: any[]) => {
@@ -274,19 +292,32 @@ export default function ScoutScreen() {
         
         {/* TOP BAR */}
         <View className="h-14 flex-row items-center px-4 justify-between bg-gray-800 border-b border-gray-700">
-            {/* Substituir Button (Left) */}
-            <Button 
-                mode="outlined" 
-                compact 
-                icon="swap-horizontal" 
-                onPress={() => setSubModalVisible(true)}
-                contentStyle={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}
-                labelStyle={{ fontSize: 12, lineHeight: 12 }}
-                textColor="#E0E0E0"
-                style={{ borderColor: "#666", paddingLeft: 2, paddingRight: 4 }}
-            >
-                Substituir
-            </Button>
+            {/* Left Group */}
+            <View className="flex-row items-center gap-2">
+                <Button 
+                    mode="outlined" 
+                    compact 
+                    icon="swap-horizontal" 
+                    onPress={() => setSubModalVisible(true)}
+                    contentStyle={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}
+                    labelStyle={{ fontSize: 12, lineHeight: 12 }}
+                    textColor="#E0E0E0"
+                    style={{ borderColor: "#666", paddingLeft: 2, paddingRight: 4 }}
+                >
+                    Substituir
+                </Button>
+                <Button
+                    mode="outlined"
+                    compact
+                    icon="flag-checkered"
+                    onPress={() => setFinishSetDialogVisible(true)}
+                    textColor="#E0E0E0"
+                    labelStyle={{ fontSize: 12, lineHeight: 12 }}
+                    style={{ borderColor: "#666", paddingLeft: 2, paddingRight: 4 }}
+                >
+                    Fim Set
+                </Button>
+            </View>
             
             {/* Score and Generic Points (Center) */}
             <View className="flex-row items-center gap-2">
@@ -320,19 +351,15 @@ export default function ScoutScreen() {
                 </Button>
             </View>
             
-            {/* Finish Set / Close Button (Right) */}
-             <View className="flex-row items-center gap-0.5">
-                <Button
-                    mode="outlined"
-                    compact
-                    icon="flag-checkered"
-                    onPress={() => setFinishSetDialogVisible(true)}
-                    textColor="#E0E0E0"
-                    labelStyle={{ fontSize: 12, lineHeight: 12 }}
-                    style={{ borderColor: "#666", paddingLeft: 2, paddingRight: 4 }}
-                >
-                    Fim Set
-                </Button>
+            {/* Edit / Close Button (Right) */}
+             <View className="flex-row items-center">
+                <IconButton 
+                    icon="dots-vertical" 
+                    size={20} 
+                    iconColor="#E0E0E0" 
+                    onPress={() => setEditMatchDialogVisible(true)} 
+                    style={{ marginRight: -8 }}
+                />
                 <IconButton icon="close" size={20} iconColor="#E0E0E0" onPress={() => router.replace('/(app)/history')} />
             </View>
         </View>
@@ -545,6 +572,32 @@ export default function ScoutScreen() {
                 <Dialog.Actions>
                     <Button onPress={() => setSubModalVisible(false)}>Cancelar</Button>
                     <Button mode="contained" onPress={confirmSubstitution} disabled={!subOutId || !subInId}>Confirmar</Button>
+                </Dialog.Actions>
+            </Dialog>
+        </Portal>
+
+        {/* EDIT MATCH DIALOG */}
+        <Portal>
+            <Dialog visible={editMatchDialogVisible} onDismiss={() => setEditMatchDialogVisible(false)}>
+                <Dialog.Title>Editar Partida</Dialog.Title>
+                <Dialog.Content>
+                    <TextInput
+                        label="Nome do Adversário"
+                        value={editOpponent}
+                        onChangeText={setEditOpponent}
+                        mode="outlined"
+                        style={{ marginBottom: 12 }}
+                    />
+                    <TextInput
+                        label="Local"
+                        value={editLocation}
+                        onChangeText={setEditLocation}
+                        mode="outlined"
+                    />
+                </Dialog.Content>
+                <Dialog.Actions>
+                    <Button onPress={() => setEditMatchDialogVisible(false)}>Cancelar</Button>
+                    <Button onPress={handleEditMatch}>Salvar</Button>
                 </Dialog.Actions>
             </Dialog>
         </Portal>

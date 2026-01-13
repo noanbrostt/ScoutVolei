@@ -1,5 +1,5 @@
 import { View, ScrollView, Modal, StyleSheet } from 'react-native';
-import { Text, useTheme, Button, Portal, Dialog, RadioButton, Divider, ActivityIndicator, IconButton } from 'react-native-paper';
+import { Text, useTheme, Button, Portal, Dialog, RadioButton, Divider, ActivityIndicator, IconButton, TextInput } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState, useMemo } from 'react';
 import { matchService } from '../../../src/services/matchService';
@@ -30,6 +30,11 @@ export default function MatchReportScreen() {
   const [playerModalVisible, setPlayerModalVisible] = useState(false);
   const [setModalVisible, setSetModalVisible] = useState(false);
 
+  // Edit Match State
+  const [editMatchDialogVisible, setEditMatchDialogVisible] = useState(false);
+  const [editOpponent, setEditOpponent] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+
   useEffect(() => {
     if (typeof matchId === 'string') {
         loadData(matchId);
@@ -42,9 +47,23 @@ export default function MatchReportScreen() {
       const acts = await matchService.getActions(id);
       const teamPlayers = await playerService.getByTeamId(m.teamId);
       setMatch(m);
+      setEditOpponent(m?.opponentName || '');
+      setEditLocation(m?.location || '');
       setMatchActions(acts);
       setRoster(teamPlayers);
       setLoading(false);
+  };
+
+  const handleEditMatch = async () => {
+      if (!match) return;
+      await matchService.update(match.id, {
+          opponentName: editOpponent,
+          location: editLocation
+      });
+      setEditMatchDialogVisible(false);
+      // Reload only match info to reflect changes
+      const m = await matchService.getById(match.id);
+      setMatch(m);
   };
 
   const handleExportPDF = async () => {
@@ -249,7 +268,10 @@ export default function MatchReportScreen() {
                     {match?.teamName || 'Meu Time'} <Text style={{ fontWeight: 'bold', color: theme.colors.primary }}>{setsUs}</Text> x <Text style={{ fontWeight: 'bold', color: theme.colors.error }}>{setsThem}</Text> {match?.opponentName}
                 </Text>
             </View>
-            {exporting ? <ActivityIndicator size="small" style={{ width: 40 }} /> : <IconButton icon="share-variant" onPress={handleExportPDF} />}
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                {exporting ? <ActivityIndicator size="small" /> : <IconButton icon="share-variant" onPress={handleExportPDF} style={{ marginRight: -18 }} />}
+                <IconButton icon="dots-vertical" size={30} onPress={() => setEditMatchDialogVisible(true)} style={{ marginRight: -8 }} />
+            </View>
         </View>
 
         {/* FILTERS */}
@@ -331,6 +353,32 @@ export default function MatchReportScreen() {
               <Dialog.Actions style={{ paddingTop: 0, minHeight: 0 }}><Button onPress={() => setSetModalVisible(false)}>Cancelar</Button></Dialog.Actions>
           </Dialog>
       </Portal>
+
+      {/* EDIT MATCH DIALOG */}
+      <Portal>
+          <Dialog visible={editMatchDialogVisible} onDismiss={() => setEditMatchDialogVisible(false)}>
+              <Dialog.Title>Editar Partida</Dialog.Title>
+              <Dialog.Content>
+                  <TextInput
+                      label="Nome do Adversário"
+                      value={editOpponent}
+                      onChangeText={setEditOpponent}
+                      mode="outlined"
+                      style={{ marginBottom: 12 }}
+                  />
+                  <TextInput
+                      label="Local"
+                      value={editLocation}
+                      onChangeText={setEditLocation}
+                      mode="outlined"
+                  />
+              </Dialog.Content>
+              <Dialog.Actions>
+                  <Button onPress={() => setEditMatchDialogVisible(false)}>Cancelar</Button>
+                  <Button onPress={handleEditMatch}>Salvar</Button>
+              </Dialog.Actions>
+          </Dialog>
+      </Portal>
     </View>
   );
 }
@@ -339,7 +387,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
     paddingVertical: 8,
     flexDirection: 'row',
     alignItems: 'center',
@@ -347,7 +395,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0', // Adjust color as needed
   },
-  headerTitle: { alignItems: 'center' },
+  headerTitle: { alignItems: 'center', marginRight: -20 },
   filterSection: { padding: 8, gap: 8, flexDirection: 'row', justifyContent: 'center' },
   filterButton: { flex: 1, borderColor: '#ccc' }, // Adjust color
   contentContainer: { paddingVertical: 16, paddingBottom: 40 },
