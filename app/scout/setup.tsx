@@ -47,7 +47,7 @@ export default function ScoutSetup() {
       setSelectedPlayerIds(selectedPlayerIds.filter(pid => pid !== id));
     } else {
       if (selectedPlayerIds.length >= 7) {
-        Alert.alert('Limite Atingido', 'Você pode selecionar no máximo 7 jogadores (6 em quadra + 1 Líbero).');
+        Alert.alert('Limite Atingido', 'Você pode selecionar no máximo 7 jogadores.');
         return;
       }
       setSelectedPlayerIds([...selectedPlayerIds, id]);
@@ -55,8 +55,8 @@ export default function ScoutSetup() {
   };
 
   const handleStart = async () => {
-    if (selectedPlayerIds.length < 7) {
-      Alert.alert('Atenção', 'Selecione exatamente 7 atletas (6 Titulares + 1 Líbero) para iniciar.');
+    if (selectedPlayerIds.length < 6) {
+      Alert.alert('Atenção', 'Selecione pelo menos 6 atletas para iniciar.');
       return;
     }
 
@@ -137,7 +137,7 @@ export default function ScoutSetup() {
         <View className="flex-1">
            <View style={{ padding: 16, paddingBottom: 8 }}>
              <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>
-               Quem começa jogando: <Text style={{ color: theme.colors.primary }}>({selectedPlayerIds.length}/7)</Text>
+               Quem começa jogando: <Text style={{ color: theme.colors.primary }}>({selectedPlayerIds.length})</Text>
              </Text>
            </View>
 
@@ -176,7 +176,7 @@ export default function ScoutSetup() {
                   mode="contained" 
                   onPress={handleStart} 
                   loading={loading}
-                  disabled={selectedPlayerIds.length < 7 || loading}
+                  disabled={selectedPlayerIds.length < 6 || loading}
                   contentStyle={{ height: 48 }}
                 >
                   Iniciar Partida

@@ -333,7 +333,7 @@ export default function ScoutScreen() {
             </View>
             
             {/* Score and Generic Points (Center) */}
-            <View className="flex-row items-center gap-2">
+            <View className="flex-row items-center gap-2 -ml-24">
                 <Button 
                     mode="contained" 
                     compact
@@ -368,15 +368,15 @@ export default function ScoutScreen() {
              <View className="flex-row items-center">
                 <IconButton 
                     icon="undo" 
-                    size={22} 
+                    size={20} 
                     iconColor="#E0E0E0" 
                     onPress={handleUndo} 
-                    style={{ margin: 0 }}
+                    style={{ margin: 0, marginRight: 4 }}
                     disabled={recentActions.length === 0}
                 />
                 <IconButton 
                     icon="dots-vertical" 
-                    size={24} 
+                    size={20} 
                     iconColor="#E0E0E0" 
                     onPress={() => setEditMatchDialogVisible(true)} 
                     style={{ margin: 0 }}
