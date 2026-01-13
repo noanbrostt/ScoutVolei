@@ -89,6 +89,8 @@ Os dados fluem através da aplicação seguindo um padrão MVVM (Model-View-View
 1.  O `syncService` é responsável por manter os dados locais sincronizados com o backend (Firebase).
 2.  O serviço inicia uma sincronização periódica após o carregamento inicial da aplicação e a conclusão das migrações do banco de dados (`app/_layout.tsx`).
 3.  As tabelas do banco de dados (teams, players, matches, matchActions) incluem os campos `syncStatus` (`pending` ou `synced`) e `deleted` (para soft deletion), que são usados pelo `syncService` para controlar o estado da sincronização.
+4.  **Estratégia de Sincronização:** O serviço opera no modelo "Push-then-Pull". Primeiro, envia todas as alterações locais pendentes para o Firebase. Em seguida, busca alterações remotas baseadas no carimbo de tempo da última sincronização (`updatedAt` > `last_sync_timestamp`).
+5.  **Resolução de Conflitos:** O sistema adota a estratégia **"Last Write Wins" (A Última Escrita Vence)**. Durante o processo de "Pull", se um registro remoto for mais recente que o local, o dado local é inteiramente sobrescrito pelo remoto e marcado como `synced`. Não há fusão granular de campos (merge) no cliente.
 
 ## 3. Módulos/Funcionalidades Principais
 
@@ -104,9 +106,10 @@ Esta seção detalha as principais funcionalidades e como elas são implementada
 
 *   **Responsabilidade:** O `matchService.ts` em `src/services/` gerencia as operações relacionadas a partidas. A gravação de ações de jogo durante o scouting é uma parte central desta funcionalidade.
 *   **Estrutura do Banco de Dados:** As tabelas `matches` e `matchActions` em `src/database/schemas/index.ts` armazenam os dados das partidas e suas ações. A tabela `matchActions` registra detalhes como `actionType`, `quality`, `scoreChange`, e está vinculada a `matches` e opcionalmente a `players`.
-*   **Fluxo:**
+*   **Fluxo e Interface:**
     *   As telas sob `app/scout/setup.tsx` e `app/scout/[matchId]/index.tsx` são usadas para configurar uma partida e registrar as ações de jogo em tempo real.
-    *   A tela `app/(app)/history.tsx` provavelmente lista as partidas anteriores.
+    *   **Interface de Scouting:** A tela `app/scout/[matchId]/index.tsx` é forçada para o modo **Paisagem (Landscape)** para otimizar o espaço. Ela apresenta uma lista vertical de jogadores à esquerda, um log de ações recentes ao centro e uma matriz de botões (Ação vs Qualidade) à direita.
+    *   **Lógica de Registro:** O sistema permite um fluxo rápido de "dois cliques". O usuário pode selecionar *Jogador -> Ação* ou *Ação -> Jogador* indistintamente para registrar um evento.
 
 ### Aniversariantes do Mês:
 
@@ -119,6 +122,7 @@ Esta seção detalha as principais funcionalidades e como elas são implementada
 *   **Componentes de UI:**
     *   `ActionTable.tsx`: Exibe ações detalhadas da partida em formato tabular.
     *   `EfficiencyBarChart.tsx`, `RadarChart.tsx`, `SplitPieChart.tsx`: Componentes gráficos para visualizar a eficiência, desempenho geral e outras métricas de jogadores e equipes.
+*   **Geração de PDF:** O arquivo PDF é gerado construindo programaticamente uma string HTML completa. Os gráficos (Radar, Barras, Pizza) são desenhados manualmente usando strings SVG dentro deste HTML, garantindo alta qualidade vetorial sem depender de bibliotecas de canvas pesadas. O HTML final é convertido para PDF usando `expo-print`.
 *   **Fluxo:** A tela `app/scout/report/[matchId].tsx` é o principal ponto de acesso para visualizar e gerar relatórios de uma partida específica. A tela `app/(app)/teams/export.tsx` provavelmente lida com a exportação de dados para equipes.
 
 ### Gerenciamento de Banco de Dados:
@@ -196,7 +200,7 @@ Para garantir um desenvolvimento eficiente e consistente, siga as seguintes dire
 *   **TypeScript:** Adira estritamente ao uso do TypeScript para todos os novos códigos e, se possível, para refatorações. Defina interfaces e tipos claros para melhorar a legibilidade e evitar erros.
 *   **Estrutura de Diretórios:** Mantenha a estrutura de diretórios existente. Ao adicionar novos módulos ou funcionalidades, crie-os em subdiretórios apropriados (`app/`, `src/components/`, `src/services/`, etc.).
 *   **Comentários:** Adicione comentários *apenas* quando o código não for autoexplicativo ou para explicar o "porquê" de uma decisão de design complexa. Evite comentários redundantes que apenas descrevem o "o quê".
-*   **Testes:** (A ser implementado/definido) Embora não haja um diretório explícito para testes, a intenção é ter cobertura de testes para os serviços e lógica de negócio. Utilize o framework de testes apropriado para React Native/Expo (ex: Jest, React Native Testing Library).
+*   **Testes:** O projeto **não possui testes automatizados** no momento. Esta foi uma decisão de projeto para acelerar o desenvolvimento inicial e devido à curva de aprendizado. Caso testes sejam implementados futuramente, recomenda-se configurar o Jest e a React Native Testing Library do zero.
 
 ### Considerações para Manutenção e Evolução:
 
