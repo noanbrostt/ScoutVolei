@@ -300,8 +300,8 @@ export default function MatchReportScreen() {
       <Portal>
           <Dialog visible={playerModalVisible} onDismiss={() => setPlayerModalVisible(false)} style={{ maxHeight: '80%' }}>
               <Dialog.Title>Filtrar por Jogador</Dialog.Title>
-              <Dialog.Content>
-                  <ScrollView>
+              <Dialog.ScrollArea style={{ paddingHorizontal: 0, paddingBottom: 0, borderTopWidth: 0, borderBottomWidth: 0 }}>
+                  <ScrollView persistentScrollbar>
                       <RadioButton.Group onValueChange={val => { setSelectedPlayerId(val === 'all' ? null : val); setPlayerModalVisible(false); }} value={selectedPlayerId || 'all'}>
                           <RadioButton.Item label="Time Todo" value="all" />
                           <Divider />
@@ -310,15 +310,15 @@ export default function MatchReportScreen() {
                           ))}
                       </RadioButton.Group>
                   </ScrollView>
-              </Dialog.Content>
-              <Dialog.Actions><Button onPress={() => setPlayerModalVisible(false)}>Cancelar</Button></Dialog.Actions>
+              </Dialog.ScrollArea>
+              <Dialog.Actions style={{ paddingTop: 0, minHeight: 0 }}><Button onPress={() => setPlayerModalVisible(false)}>Cancelar</Button></Dialog.Actions>
           </Dialog>
       </Portal>
       <Portal>
-          <Dialog visible={setModalVisible} onDismiss={() => setSetModalVisible(false)}>
+          <Dialog visible={setModalVisible} onDismiss={() => setSetModalVisible(false)} style={{ maxHeight: '80%' }}>
               <Dialog.Title>Filtrar por Set</Dialog.Title>
-              <Dialog.Content>
-                  <ScrollView>
+              <Dialog.ScrollArea style={{ paddingHorizontal: 0, paddingBottom: 0, borderTopWidth: 0, borderBottomWidth: 0 }}>
+                  <ScrollView persistentScrollbar>
                       <RadioButton.Group onValueChange={val => { setSelectedSet(val === 'all' ? null : parseInt(val)); setSetModalVisible(false); }} value={selectedSet !== null ? String(selectedSet) : 'all'}>
                           <RadioButton.Item label="Jogo Todo" value="all" />
                           <Divider />
@@ -327,8 +327,8 @@ export default function MatchReportScreen() {
                           ))}
                       </RadioButton.Group>
                   </ScrollView>
-              </Dialog.Content>
-              <Dialog.Actions><Button onPress={() => setSetModalVisible(false)}>Cancelar</Button></Dialog.Actions>
+              </Dialog.ScrollArea>
+              <Dialog.Actions style={{ paddingTop: 0, minHeight: 0 }}><Button onPress={() => setSetModalVisible(false)}>Cancelar</Button></Dialog.Actions>
           </Dialog>
       </Portal>
     </View>
