@@ -201,7 +201,7 @@ export default function ExportTeam() {
         {players.map(player => (
           <Checkbox.Item
             key={player.id}
-            label={`${player.name} (#${player.number})`}
+            label={player.name}
             status={selectedPlayers.includes(player.id) ? 'checked' : 'unchecked'}
             onPress={() => togglePlayer(player.id)}
             position="leading"
