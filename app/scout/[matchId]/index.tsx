@@ -1,5 +1,5 @@
-import { View, StatusBar, Platform, ScrollView, FlatList, Alert } from 'react-native';
-import { Text, Button, IconButton, useTheme, Portal, Dialog, RadioButton, Surface, TouchableRipple, TextInput } from 'react-native-paper';
+import { View, StatusBar, Platform, ScrollView, FlatList, Alert, Dimensions } from 'react-native';
+import { Text, Button, IconButton, useTheme, Portal, Dialog, RadioButton, Surface, TouchableRipple, TextInput, Checkbox } from 'react-native-paper';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useState, useEffect, useCallback } from 'react';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -50,8 +50,8 @@ export default function ScoutScreen() {
   
   // Substitution State
   const [subModalVisible, setSubModalVisible] = useState(false);
-  const [subOutId, setSubOutId] = useState<string | null>(null);
-  const [subInId, setSubInId] = useState<string | null>(null);
+  const [subOutIds, setSubOutIds] = useState<string[]>([]);
+  const [subInIds, setSubInIds] = useState<string[]>([]);
 
   // Finish Set / Match State
   const [finishSetDialogVisible, setFinishSetDialogVisible] = useState(false);
@@ -268,21 +268,38 @@ export default function ScoutScreen() {
   };
 
   // --- Substitution ---
+  const toggleSubOut = (id: string) => {
+    if (subOutIds.includes(id)) {
+        setSubOutIds(subOutIds.filter(x => x !== id));
+    } else {
+        setSubOutIds([...subOutIds, id]);
+    }
+  };
+
+  const toggleSubIn = (id: string) => {
+    if (subInIds.includes(id)) {
+        setSubInIds(subInIds.filter(x => x !== id));
+    } else {
+        setSubInIds([...subInIds, id]);
+    }
+  };
+
   const confirmSubstitution = () => {
-    if (!subOutId || !subInId) return;
+    const activeIds = activePlayers.map(p => p.id);
+    const remainingIds = activeIds.filter(id => !subOutIds.includes(id));
+    const newActiveIds = [...remainingIds, ...subInIds];
+
+    if (newActiveIds.length < 6 || newActiveIds.length > 7) {
+        Alert.alert('Erro', 'O time deve ficar com 6 ou 7 jogadores em quadra.');
+        return;
+    }
     
-    const newActive = activePlayers.map(p => {
-      if (p.id === subOutId) {
-        return allPlayers.find(ap => ap.id === subInId);
-      }
-      return p;
-    });
-    
+    const newActive = allPlayers.filter(p => newActiveIds.includes(p.id));
     sortActivePlayers(newActive);
     
     setSubModalVisible(false);
-    setSubOutId(null);
-    setSubInId(null);
+    setSubOutIds([]);
+    setSubInIds([]);
   };
 
   const getReservePlayers = () => {
@@ -538,9 +555,9 @@ export default function ScoutScreen() {
 
         {/* SUBSTITUTION MODAL */}
         <Portal>
-            <Dialog visible={subModalVisible} onDismiss={() => setSubModalVisible(false)} style={{ maxHeight: '90%' }}>
-                <Dialog.Content>
-                    <View style={{ height: 200, overflow: 'hidden' }}> 
+            <Dialog visible={subModalVisible} onDismiss={() => setSubModalVisible(false)} style={{ height: '95%', maxHeight: '95%' }}>
+                <Dialog.ScrollArea style={{ flex: 1, paddingHorizontal: 16, minHeight: '70%' }}>
+                    <View style={{ flex: 1, paddingVertical: 8 }}> 
                         {/* Headers Fixed */}
                         <View className="flex-row justify-between border-b border-gray-200 pb-2 mb-2">
                             <View className="flex-1 mr-2">
@@ -555,18 +572,21 @@ export default function ScoutScreen() {
                         <View className="flex-1 flex-row"> 
                             {/* OUT List */}
                             <ScrollView className="flex-1 mr-2" nestedScrollEnabled contentContainerStyle={{ paddingBottom: 16 }}>
-                                <RadioButton.Group onValueChange={v => setSubOutId(v)} value={subOutId || ''}>
-                                    {activePlayers.map(p => (
-                                        <RadioButton.Item 
+                                {activePlayers.map(p => {
+                                    const isSelected = subOutIds.includes(p.id);
+                                    return (
+                                        <Checkbox.Item 
                                             key={p.id} 
                                             label={(p.surname || p.name).toUpperCase()} 
-                                            value={p.id} 
+                                            status={isSelected ? 'checked' : 'unchecked'}
+                                            onPress={() => toggleSubOut(p.id)}
                                             mode="android" 
-                                            style={{ paddingVertical: 4 }}
-                                            labelStyle={{ fontSize: 14 }}
+                                            style={{ paddingVertical: 0 }}
+                                            labelStyle={{ fontSize: 14, textAlign: 'left' }}
+                                            position="leading"
                                         />
-                                    ))}
-                                </RadioButton.Group>
+                                    );
+                                })}
                             </ScrollView>
 
                             {/* Vertical Divider */}
@@ -574,25 +594,28 @@ export default function ScoutScreen() {
 
                             {/* IN List */}
                             <ScrollView className="flex-1 ml-2" nestedScrollEnabled contentContainerStyle={{ paddingBottom: 16 }}>
-                                <RadioButton.Group onValueChange={v => setSubInId(v)} value={subInId || ''}>
-                                    {getReservePlayers().map(p => (
-                                        <RadioButton.Item 
+                                {getReservePlayers().map(p => {
+                                    const isSelected = subInIds.includes(p.id);
+                                    return (
+                                        <Checkbox.Item 
                                             key={p.id} 
                                             label={(p.surname || p.name).toUpperCase()} 
-                                            value={p.id} 
+                                            status={isSelected ? 'checked' : 'unchecked'}
+                                            onPress={() => toggleSubIn(p.id)}
                                             mode="android" 
-                                            style={{ paddingVertical: 4 }}
-                                            labelStyle={{ fontSize: 14 }}
+                                            style={{ paddingVertical: 0 }}
+                                            labelStyle={{ fontSize: 14, textAlign: 'left' }}
+                                            position="leading"
                                         />
-                                    ))}
-                                </RadioButton.Group>
+                                    );
+                                })}
                             </ScrollView>
                         </View>
                     </View>
-                </Dialog.Content>
-                <Dialog.Actions>
+                </Dialog.ScrollArea>
+                <Dialog.Actions style={{ paddingVertical: 0, marginTop: -16 }}>
                     <Button onPress={() => setSubModalVisible(false)}>Cancelar</Button>
-                    <Button mode="contained" onPress={confirmSubstitution} disabled={!subOutId || !subInId}>Confirmar</Button>
+                    <Button mode="contained" onPress={confirmSubstitution} disabled={subOutIds.length === 0 && subInIds.length === 0}>Confirmar</Button>
                 </Dialog.Actions>
             </Dialog>
         </Portal>
