@@ -155,6 +155,19 @@ export default function ScoutScreen() {
       refreshMatch();
   };
 
+  const handleUndo = async () => {
+    if (recentActions.length === 0) return;
+    const lastAction = recentActions[0];
+    
+    Alert.alert('Desfazer Ação', 'Deseja excluir esta ação e reverter a pontuação?', [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Excluir', style: 'destructive', onPress: async () => {
+            await matchService.deleteAction(lastAction.id);
+            refreshMatch();
+        }}
+    ]);
+  };
+
   const sortActivePlayers = (players: any[]) => {
       const sorted = [...players].sort((a, b) => {
           const posA = POSITION_ORDER[a.position] || 99;
@@ -354,11 +367,19 @@ export default function ScoutScreen() {
             {/* Edit / Close Button (Right) */}
              <View className="flex-row items-center">
                 <IconButton 
+                    icon="undo" 
+                    size={22} 
+                    iconColor="#E0E0E0" 
+                    onPress={handleUndo} 
+                    style={{ margin: 0 }}
+                    disabled={recentActions.length === 0}
+                />
+                <IconButton 
                     icon="dots-vertical" 
-                    size={20} 
+                    size={24} 
                     iconColor="#E0E0E0" 
                     onPress={() => setEditMatchDialogVisible(true)} 
-                    style={{ marginRight: -8 }}
+                    style={{ margin: 0 }}
                 />
                 <IconButton icon="close" size={20} iconColor="#E0E0E0" onPress={() => router.replace('/(app)/history')} />
             </View>
