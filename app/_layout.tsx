@@ -4,20 +4,60 @@ import { useThemeStore } from '../src/store/themeStore';
 import { CombinedDefaultTheme, CombinedDarkTheme } from '../src/theme';
 import "../global.css";
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
-import { db } from '../src/database/db';
+import { db, dbReady, canUseSQLite } from '../src/database/db';
 import migrations from '../drizzle/migrations';
-import { View, Text } from 'react-native';
+import { View, Text, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useEffect } from "react";
-import { syncService } from "../src/services/syncService"; // Import syncService
+import { useEffect, useState } from "react";
+import { syncService } from "../src/services/syncService";
 
+// Three separate components so hooks are never called conditionally.
 export default function RootLayout() {
+  if (!canUseSQLite) {
+    // Web first load: SharedArrayBuffer not yet available.
+    // Register the service worker and wait for the page to reload.
+    return <WebCrossOriginInit />;
+  }
+  return <AppLayout />;
+}
+
+// Shown on the first web load before the service worker activates and the page reloads.
+// SW registration is handled by the inline script in app/+html.tsx (runs before the bundle).
+function WebCrossOriginInit() {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <Text>Inicializando...</Text>
+    </View>
+  );
+}
+
+function AppLayout() {
+  // On web, the SQLite WASM must finish loading before db is usable.
+  // On native, db is set synchronously so we can start ready.
+  const [dbInitialized, setDbInitialized] = useState(Platform.OS !== 'web');
+
+  useEffect(() => {
+    if (!dbInitialized) {
+      dbReady.then(() => setDbInitialized(true)).catch(console.error);
+    }
+  }, []);
+
+  if (!dbInitialized) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>Carregando...</Text>
+      </View>
+    );
+  }
+
+  return <AppLayoutInner />;
+}
+
+function AppLayoutInner() {
   const { mode } = useThemeStore();
-  
-  // Derive theme based on mode (ignoring system for now for simplicity)
-  const theme = mode === 'dark' ? CombinedDarkTheme : CombinedDefaultTheme; 
+  const theme = mode === 'dark' ? CombinedDarkTheme : CombinedDefaultTheme;
 
   const { success, error } = useMigrations(db, migrations);
 

@@ -14,3 +14,6 @@ web-build/
 
 # TypeScript
 *.tsbuildinfo
+
+CLAUDE.md
+.claude/*
