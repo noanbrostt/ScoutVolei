@@ -1,5 +1,7 @@
-import { View, ScrollView, Modal, StyleSheet } from 'react-native';
-import { Text, useTheme, Button, Portal, Dialog, RadioButton, Divider, ActivityIndicator, IconButton, TextInput } from 'react-native-paper';
+import { View, ScrollView, Modal, StyleSheet, Alert } from 'react-native';
+import { Text, useTheme, Button, Portal, Dialog, RadioButton, Divider, ActivityIndicator, IconButton, TextInput, Menu } from 'react-native-paper';
+import { useAuthStore } from '../../../src/store/authStore';
+import { syncService } from '../../../src/services/syncService';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState, useMemo } from 'react';
 import { matchService } from '../../../src/services/matchService';
@@ -15,6 +17,7 @@ export default function MatchReportScreen() {
   const { matchId } = useLocalSearchParams();
   const theme = useTheme();
   const router = useRouter();
+  const { user } = useAuthStore();
 
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -34,6 +37,7 @@ export default function MatchReportScreen() {
   const [editMatchDialogVisible, setEditMatchDialogVisible] = useState(false);
   const [editOpponent, setEditOpponent] = useState('');
   const [editLocation, setEditLocation] = useState('');
+  const [menuVisible, setMenuVisible] = useState(false);
 
   useEffect(() => {
     if (typeof matchId === 'string') {
@@ -52,6 +56,21 @@ export default function MatchReportScreen() {
       setMatchActions(acts);
       setRoster(teamPlayers);
       setLoading(false);
+  };
+
+  const handleReopenMatch = () => {
+    Alert.alert(
+      'Continuar Scout',
+      'Deseja reabrir esta partida e continuar o scout?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Continuar', onPress: async () => {
+          await matchService.reopen(match.id);
+          syncService.triggerSync();
+          router.replace({ pathname: '/scout/[matchId]', params: { matchId: match.id } });
+        }},
+      ]
+    );
   };
 
   const handleEditMatch = async () => {
@@ -270,7 +289,16 @@ export default function MatchReportScreen() {
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 {exporting ? <ActivityIndicator size="small" /> : <IconButton icon="share-variant" onPress={handleExportPDF} style={{ marginRight: -18 }} />}
-                <IconButton icon="dots-vertical" size={30} onPress={() => setEditMatchDialogVisible(true)} style={{ marginRight: -8 }} />
+                <Menu
+                  visible={menuVisible}
+                  onDismiss={() => setMenuVisible(false)}
+                  anchor={<IconButton icon="dots-vertical" size={30} onPress={() => setMenuVisible(true)} style={{ marginRight: -8 }} />}
+                >
+                  <Menu.Item leadingIcon="pencil" onPress={() => { setMenuVisible(false); setEditMatchDialogVisible(true); }} title="Editar Partida" />
+                  {user?.role === 'admin' && (
+                    <Menu.Item leadingIcon="play" onPress={() => { setMenuVisible(false); handleReopenMatch(); }} title="Continuar Scout" />
+                  )}
+                </Menu>
             </View>
         </View>
 

@@ -230,5 +230,9 @@ export const matchService = {
 
   finish: async (matchId: string) => {
     await db.update(matches).set({ isFinished: true, updatedAt: new Date().toISOString(), syncStatus: 'pending' }).where(eq(matches.id, matchId));
-  }
+  },
+
+  reopen: async (matchId: string) => {
+    await db.update(matches).set({ isFinished: false, updatedAt: new Date().toISOString(), syncStatus: 'pending' }).where(eq(matches.id, matchId));
+  },
 };
