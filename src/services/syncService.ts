@@ -1,8 +1,8 @@
 import { firestoreDb } from '../services/firebaseConfig';
-import { collection, doc, getDoc, setDoc, deleteDoc, query, where, getDocs, writeBatch, Timestamp, orderBy, limit } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../database/db';
 import { teams, players, matches, matchActions } from '../database/schemas';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import * as Network from 'expo-network';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -17,17 +17,6 @@ const toFirestoreDoc = (item: any) => {
     return rest;
 };
 
-// Helper to update local item as synced
-const markAsSynced = async (tx: any, table: any, id: string) => {
-    await tx.update(table)
-        .set({ syncStatus: 'synced' })
-        .where(eq(table.id, id));
-};
-
-// Helper to physically delete local item
-const physicallyDeleteLocal = async (tx: any, table: any, id: string) => {
-    await tx.delete(table).where(eq(table.id, id));
-};
 
 export const syncService = {
 
@@ -41,13 +30,14 @@ export const syncService = {
         console.log('Starting sync cycle...');
         try {
             // 1. PUSH: Send local changes to Firestore
-            await db.transaction(async (tx) => {
-                await syncService.syncDeleted(tx);
-                await syncService.syncTeams(tx);
-                await syncService.syncPlayers(tx);
-                await syncService.syncMatches(tx);
-                await syncService.syncMatchActions(tx);
-            });
+            // Read pending items from SQLite first (short read-only queries),
+            // then do Firestore network calls outside any transaction,
+            // then update SQLite sync status in small write transactions.
+            await syncService.syncDeleted();
+            await syncService.syncTeams();
+            await syncService.syncPlayers();
+            await syncService.syncMatches();
+            await syncService.syncMatchActions();
 
             // 2. PULL: Get remote changes from Firestore
             await syncService.pullFromFirestore();
@@ -61,7 +51,7 @@ export const syncService = {
 
     // --- PUSH METHODS (Local -> Cloud) ---
 
-    syncDeleted: async (tx: any) => {
+    syncDeleted: async () => {
         const collections = [
             { name: 'matchActions', table: matchActions },
             { name: 'matches', table: matches },
@@ -70,73 +60,71 @@ export const syncService = {
         ];
 
         for (const { name, table } of collections) {
-            const deletedLocal = await tx.select().from(table).where(and(eq(table.deleted, true), eq(table.syncStatus, 'pending')));
-            
+            const deletedLocal = await db.select().from(table).where(and(eq(table.deleted, true), eq(table.syncStatus, 'pending')));
+
             for (const item of deletedLocal) {
                 try {
                     const docRef = doc(firestoreDb, name, item.id);
                     await deleteDoc(docRef);
-                    await physicallyDeleteLocal(tx, table, item.id);
-                    console.log(`Deleted ${name} ${item.id} from cloud and local.`);
                 } catch (error: any) {
-                    if (error.code === 'not-found') {
-                        await physicallyDeleteLocal(tx, table, item.id);
-                    } else {
+                    if (error.code !== 'not-found') {
                         console.error(`Failed to delete ${name} ${item.id}:`, error);
+                        continue;
                     }
                 }
+                await db.delete(table).where(eq(table.id, item.id));
+                console.log(`Deleted ${name} ${item.id} from cloud and local.`);
             }
         }
     },
 
-    syncTeams: async (tx: any) => {
-        const teamsToSync = await tx.select().from(teams).where(and(eq(teams.syncStatus, 'pending'), eq(teams.deleted, false)));
+    syncTeams: async () => {
+        const teamsToSync = await db.select().from(teams).where(and(eq(teams.syncStatus, 'pending'), eq(teams.deleted, false)));
         for (const team of teamsToSync) {
             try {
                 const docRef = doc(firestoreDb, 'teams', team.id);
                 await setDoc(docRef, toFirestoreDoc(team), { merge: true });
-                await markAsSynced(tx, teams, team.id);
+                await db.update(teams).set({ syncStatus: 'synced' }).where(eq(teams.id, team.id));
             } catch (error) {
                 console.error(`Failed to sync team ${team.id}:`, error);
             }
         }
     },
 
-    syncPlayers: async (tx: any) => {
-        const playersToSync = await tx.select().from(players).where(and(eq(players.syncStatus, 'pending'), eq(players.deleted, false)));
+    syncPlayers: async () => {
+        const playersToSync = await db.select().from(players).where(and(eq(players.syncStatus, 'pending'), eq(players.deleted, false)));
         for (const player of playersToSync) {
             try {
                 const docRef = doc(firestoreDb, 'players', player.id);
                 await setDoc(docRef, toFirestoreDoc(player), { merge: true });
-                await markAsSynced(tx, players, player.id);
+                await db.update(players).set({ syncStatus: 'synced' }).where(eq(players.id, player.id));
             } catch (error) {
                 console.error(`Failed to sync player ${player.id}:`, error);
             }
         }
     },
 
-    syncMatches: async (tx: any) => {
-        const matchesToSync = await tx.select().from(matches).where(and(eq(matches.syncStatus, 'pending'), eq(matches.deleted, false)));
+    syncMatches: async () => {
+        const matchesToSync = await db.select().from(matches).where(and(eq(matches.syncStatus, 'pending'), eq(matches.deleted, false)));
         for (const match of matchesToSync) {
             try {
                 const docRef = doc(firestoreDb, 'matches', match.id);
                 await setDoc(docRef, toFirestoreDoc(match), { merge: true });
-                await markAsSynced(tx, matches, match.id);
+                await db.update(matches).set({ syncStatus: 'synced' }).where(eq(matches.id, match.id));
             } catch (error) {
                 console.error(`Failed to sync match ${match.id}:`, error);
             }
         }
     },
 
-    syncMatchActions: async (tx: any) => {
-        // Sync all pending match actions immediately (point-by-point)
-        const actionsToSync = await tx.select().from(matchActions).where(and(eq(matchActions.syncStatus, 'pending'), eq(matchActions.deleted, false)));
-        
+    syncMatchActions: async () => {
+        const actionsToSync = await db.select().from(matchActions).where(and(eq(matchActions.syncStatus, 'pending'), eq(matchActions.deleted, false)));
+
         for (const action of actionsToSync) {
             try {
                 const docRef = doc(firestoreDb, 'matchActions', action.id);
                 await setDoc(docRef, toFirestoreDoc(action), { merge: true });
-                await markAsSynced(tx, matchActions, action.id);
+                await db.update(matchActions).set({ syncStatus: 'synced' }).where(eq(matchActions.id, action.id));
             } catch (error) {
                 console.error(`Failed to sync match action ${action.id}:`, error);
             }
@@ -203,9 +191,21 @@ export const syncService = {
         console.log(`Pull complete. Updated lastSync to ${now}`);
     },
 
-    startPeriodicSync: () => {
-        console.log(`Starting periodic sync every ${SYNC_INTERVAL_MS / 1000} seconds.`);
-        setInterval(syncService.syncAll, SYNC_INTERVAL_MS);
+    syncOnAppStart: () => {
+        console.log('Running initial sync on app start.');
+        syncService.syncAll();
+    },
+
+    _debounceTimer: null as ReturnType<typeof setTimeout> | null,
+
+    triggerSync: () => {
+        if (syncService._debounceTimer) {
+            clearTimeout(syncService._debounceTimer);
+        }
+        syncService._debounceTimer = setTimeout(() => {
+            syncService._debounceTimer = null;
+            syncService.syncAll();
+        }, 4000);
     },
 
     // Event System for UI Reactivity

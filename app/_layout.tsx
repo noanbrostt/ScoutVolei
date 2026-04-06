@@ -68,7 +68,7 @@ function AppLayoutInner() {
 
   useEffect(() => {
     if (success && fontsLoaded) {
-      syncService.startPeriodicSync();
+      syncService.syncOnAppStart();
     }
   }, [success, fontsLoaded]);
 

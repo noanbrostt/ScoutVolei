@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { matchService } from '../../../src/services/matchService';
 import { playerService } from '../../../src/services/playerService';
+import { syncService } from '../../../src/services/syncService';
 import * as NavigationBar from 'expo-navigation-bar';
 
 // Actions Config
@@ -142,6 +143,7 @@ export default function ScoutScreen() {
   const handleEndMatch = async () => {
       if (!match) return;
       await matchService.finish(match.id);
+      syncService.triggerSync();
       router.replace('/(app)/history');
   };
 
@@ -164,6 +166,7 @@ export default function ScoutScreen() {
         { text: 'Excluir', style: 'destructive', onPress: async () => {
             await matchService.deleteAction(lastAction.id);
             refreshMatch();
+            syncService.triggerSync();
         }}
     ]);
   };
@@ -191,6 +194,7 @@ export default function ScoutScreen() {
           { text: 'Excluir', style: 'destructive', onPress: async () => {
               await matchService.deleteAction(actionId);
               refreshMatch();
+              syncService.triggerSync();
           }}
       ]);
   };
@@ -223,6 +227,7 @@ export default function ScoutScreen() {
       setSelectedPlayerId(null);
       setPendingAction(null);
       refreshMatch();
+      syncService.triggerSync();
   };
 
   // --- Interactions ---
@@ -265,6 +270,7 @@ export default function ScoutScreen() {
           scoreChange
       });
       refreshMatch();
+      syncService.triggerSync();
   };
 
   // --- Substitution ---
