@@ -3,6 +3,7 @@ import { TextInput, Button, Appbar, useTheme, Text } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { teamService } from '../../../src/services/teamService';
+import { syncService } from '../../../src/services/syncService';
 
 const TEAM_COLORS = [
   '#2196F3', // Blue
@@ -31,6 +32,7 @@ export default function NewTeam() {
     setSaving(true);
     try {
       await teamService.create(name, selectedColor);
+      syncService.triggerSync();
       router.back();
     } catch (e) {
       console.error(e);

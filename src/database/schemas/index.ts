@@ -41,6 +41,7 @@ export const matches = sqliteTable('matches', {
   updatedAt: text('updated_at').notNull(),
   syncStatus: text('sync_status').$type<'pending' | 'synced'>().default('pending').notNull(),
   deleted: integer('deleted', { mode: 'boolean' }).default(false).notNull(),
+  lineup: text('lineup'), // JSON array of player IDs currently on court
 });
 
 export const matchActions = sqliteTable('match_actions', {

@@ -7,7 +7,6 @@ import { matchService } from '../../../src/services/matchService';
 import { playerService } from '../../../src/services/playerService';
 import { syncService } from '../../../src/services/syncService';
 import * as NavigationBar from 'expo-navigation-bar';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Actions Config
 const ACTIONS = [
@@ -100,10 +99,9 @@ export default function ScoutScreen() {
           
           let activeIds: string[] = [];
 
-          // 1. Tentar restaurar lineup salva (ao retornar para uma partida em andamento)
-          const savedLineup = await AsyncStorage.getItem(`lineup_${id}`);
-          if (savedLineup) {
-            try { activeIds = JSON.parse(savedLineup); } catch (e) {}
+          // 1. Restaurar lineup salva no banco (persiste entre dispositivos)
+          if (m.lineup) {
+            try { activeIds = JSON.parse(m.lineup); } catch (e) {}
           }
 
           // 2. Fallback para o lineup enviado pela tela de setup (partida nova)
@@ -188,7 +186,7 @@ export default function ScoutScreen() {
       });
       setActivePlayers(sorted);
       if (typeof matchId === 'string') {
-          AsyncStorage.setItem(`lineup_${matchId}`, JSON.stringify(sorted.map(p => p.id)));
+          matchService.saveLineup(matchId, sorted.map(p => p.id));
       }
   };
 
@@ -314,7 +312,8 @@ export default function ScoutScreen() {
     
     const newActive = allPlayers.filter(p => newActiveIds.includes(p.id));
     sortActivePlayers(newActive);
-    
+    syncService.triggerSync();
+
     setSubModalVisible(false);
     setSubOutIds([]);
     setSubInIds([]);

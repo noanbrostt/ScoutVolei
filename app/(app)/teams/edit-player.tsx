@@ -3,6 +3,7 @@ import { TextInput, Button, Appbar, useTheme, SegmentedButtons, Text } from 'rea
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { playerService } from '../../../src/services/playerService';
+import { syncService } from '../../../src/services/syncService';
 
 export default function EditPlayer() {
   const router = useRouter();
@@ -77,7 +78,7 @@ export default function EditPlayer() {
     
     setSaving(true);
     try {
-      await playerService.update(playerId, {
+      await playerService.update(playerId as string, {
         name,
         surname: surname.trim() === '' ? null : surname,
         number: number.trim() === '' ? null : parseInt(number),
@@ -87,6 +88,7 @@ export default function EditPlayer() {
         birthday: birthday.trim() === '' ? null : birthday,
         allergies: allergies.trim() === '' ? null : allergies,
       });
+      syncService.triggerSync();
       router.back();
     } catch (e) {
       console.error(e);

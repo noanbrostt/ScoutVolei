@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import { teamService } from '../../src/services/teamService';
 import { playerService } from '../../src/services/playerService';
 import { matchService } from '../../src/services/matchService';
+import { syncService } from '../../src/services/syncService';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function ScoutSetup() {
@@ -64,6 +65,7 @@ export default function ScoutSetup() {
     try {
       // Create match
       const match = await matchService.create(selectedTeam.id, opponent.trim() || 'Adversário', location);
+      syncService.triggerSync();
       
       // Pass selected players to the scout screen via params
       router.replace({

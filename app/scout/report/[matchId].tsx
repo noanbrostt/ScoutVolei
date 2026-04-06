@@ -79,6 +79,7 @@ export default function MatchReportScreen() {
           opponentName: editOpponent,
           location: editLocation
       });
+      syncService.triggerSync();
       setEditMatchDialogVisible(false);
       // Reload only match info to reflect changes
       const m = await matchService.getById(match.id);

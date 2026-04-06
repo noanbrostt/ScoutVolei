@@ -55,6 +55,7 @@ export default function MatchesHistory() {
         { text: 'Cancelar', style: 'cancel' },
         { text: 'Excluir', style: 'destructive', onPress: async () => {
           await matchService.delete(matchId);
+          syncService.triggerSync();
           loadData();
         }},
       ]

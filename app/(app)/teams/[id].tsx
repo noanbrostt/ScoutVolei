@@ -80,6 +80,7 @@ export default function TeamDetails() {
         style: 'destructive', 
         onPress: async () => {
           await playerService.delete(playerId);
+          syncService.triggerSync();
           loadData();
         }
       }
@@ -94,6 +95,7 @@ export default function TeamDetails() {
         style: 'destructive', 
         onPress: async () => {
           await teamService.delete(id as string);
+          syncService.triggerSync();
           router.back();
         }
       }

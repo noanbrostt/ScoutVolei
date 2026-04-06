@@ -235,4 +235,10 @@ export const matchService = {
   reopen: async (matchId: string) => {
     await db.update(matches).set({ isFinished: false, updatedAt: new Date().toISOString(), syncStatus: 'pending' }).where(eq(matches.id, matchId));
   },
+
+  saveLineup: async (matchId: string, playerIds: string[]) => {
+    await db.update(matches)
+      .set({ lineup: JSON.stringify(playerIds), updatedAt: new Date().toISOString(), syncStatus: 'pending' })
+      .where(eq(matches.id, matchId));
+  },
 };

@@ -3,6 +3,7 @@ import { TextInput, Button, Appbar, useTheme, SegmentedButtons, Text } from 'rea
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { playerService } from '../../../src/services/playerService';
+import { syncService } from '../../../src/services/syncService';
 
 export default function AddPlayer() {
   const router = useRouter();
@@ -68,6 +69,7 @@ export default function AddPlayer() {
         birthday: birthday.trim() === '' ? undefined : birthday,
         allergies: allergies.trim() === '' ? undefined : allergies,
       });
+      syncService.triggerSync();
       router.back();
     } catch (e) {
       console.error(e);
