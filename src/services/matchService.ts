@@ -54,7 +54,8 @@ export const matchService = {
       // Fetch matches joined with team name
       const matchesData = await db.select({
           match: matches,
-          teamName: teams.name
+          teamName: teams.name,
+          teamColor: teams.color,
       })
       .from(matches)
       .leftJoin(teams, eq(matches.teamId, teams.id))
@@ -97,6 +98,7 @@ export const matchService = {
           return {
               ...row.match,
               teamName: row.teamName || 'Meu Time',
+              teamColor: row.teamColor || null,
               setsUs,
               setsThem,
               hasPendingData: row.match.syncStatus === 'pending' || hasPendingActions
@@ -179,6 +181,51 @@ export const matchService = {
   undoLastAction: async (matchId: string) => {
       // Logic to undo last action and revert score
       // This is complex, skipping for MVP initial implementation but acknowledging need.
+  },
+
+  getByTeam: async (teamId: string) => {
+      const matchesData = await db.select({
+          match: matches,
+          teamName: teams.name,
+          teamColor: teams.color,
+      })
+      .from(matches)
+      .leftJoin(teams, eq(matches.teamId, teams.id))
+      .where(and(eq(matches.deleted, false), eq(matches.teamId, teamId)))
+      .orderBy(desc(matches.date));
+
+      const allActions = await db.select({
+          matchId: matchActions.matchId,
+          setNumber: matchActions.setNumber,
+          scoreChange: matchActions.scoreChange,
+          syncStatus: matchActions.syncStatus
+      }).from(matchActions).where(eq(matchActions.deleted, false));
+
+      return matchesData.map(row => {
+          const mActions = allActions.filter(a => a.matchId === row.match.id);
+          const hasPendingActions = mActions.some(a => a.syncStatus === 'pending');
+          const setScores: Record<number, { us: number, them: number }> = {};
+          mActions.forEach(a => {
+              if (!setScores[a.setNumber]) setScores[a.setNumber] = { us: 0, them: 0 };
+              const change = a.scoreChange || 0;
+              if (change > 0) setScores[a.setNumber].us++;
+              if (change < 0) setScores[a.setNumber].them++;
+          });
+          let setsUs = 0;
+          let setsThem = 0;
+          Object.values(setScores).forEach(score => {
+              if (score.us > score.them) setsUs++;
+              else if (score.them > score.us) setsThem++;
+          });
+          return {
+              ...row.match,
+              teamName: row.teamName || 'Meu Time',
+              teamColor: row.teamColor || null,
+              setsUs,
+              setsThem,
+              hasPendingData: row.match.syncStatus === 'pending' || hasPendingActions
+          };
+      });
   },
 
   finish: async (matchId: string) => {
