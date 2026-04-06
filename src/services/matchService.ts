@@ -111,10 +111,13 @@ export const matchService = {
   },
 
   delete: async (matchId: string) => {
+      const now = new Date().toISOString();
       await db.update(matches)
-        .set({ deleted: true, updatedAt: new Date().toISOString(), syncStatus: 'pending' })
+        .set({ deleted: true, updatedAt: now, syncStatus: 'pending' })
         .where(eq(matches.id, matchId));
-      // No need to cascade delete matchActions here, sync service will handle it
+      await db.update(matchActions)
+        .set({ deleted: true, timestamp: now, syncStatus: 'pending' })
+        .where(eq(matchActions.matchId, matchId));
   },
 
   deleteAction: async (actionId: string) => {

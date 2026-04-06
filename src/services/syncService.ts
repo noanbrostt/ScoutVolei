@@ -1,5 +1,5 @@
 import { firestoreDb } from '../services/firebaseConfig';
-import { collection, doc, setDoc, deleteDoc, query, where, getDocs } from 'firebase/firestore';
+import { collection, doc, setDoc, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../database/db';
 import { teams, players, matches, matchActions } from '../database/schemas';
 import { eq, and } from 'drizzle-orm';
@@ -53,27 +53,26 @@ export const syncService = {
 
     syncDeleted: async () => {
         const collections = [
-            { name: 'matchActions', table: matchActions },
-            { name: 'matches', table: matches },
-            { name: 'players', table: players },
-            { name: 'teams', table: teams },
+            { name: 'matchActions', table: matchActions, tsField: 'timestamp' },
+            { name: 'matches', table: matches, tsField: 'updatedAt' },
+            { name: 'players', table: players, tsField: 'updatedAt' },
+            { name: 'teams', table: teams, tsField: 'updatedAt' },
         ];
 
-        for (const { name, table } of collections) {
+        for (const { name, table, tsField } of collections) {
             const deletedLocal = await db.select().from(table).where(and(eq(table.deleted, true), eq(table.syncStatus, 'pending')));
 
             for (const item of deletedLocal) {
                 try {
                     const docRef = doc(firestoreDb, name, item.id);
-                    await deleteDoc(docRef);
+                    // Write tombstone so other devices detect the deletion on pull
+                    await setDoc(docRef, { id: item.id, deleted: true, [tsField]: new Date().toISOString() }, { merge: true });
                 } catch (error: any) {
-                    if (error.code !== 'not-found') {
-                        console.error(`Failed to delete ${name} ${item.id}:`, error);
-                        continue;
-                    }
+                    console.error(`Failed to tombstone ${name} ${item.id}:`, error);
+                    continue;
                 }
                 await db.delete(table).where(eq(table.id, item.id));
-                console.log(`Deleted ${name} ${item.id} from cloud and local.`);
+                console.log(`Tombstoned ${name} ${item.id} in cloud, hard-deleted locally.`);
             }
         }
     },
@@ -141,12 +140,14 @@ export const syncService = {
 
         console.log(`Pulling changes since ${lastSyncDate.toISOString()}...`);
 
-        // Helper to upsert local
+        // Helper to upsert local (handles tombstones with deleted: true)
         const upsertLocal = async (table: any, data: any) => {
+            if (data.deleted) {
+                await db.delete(table).where(eq(table.id, data.id));
+                return;
+            }
             const existing = await db.select().from(table).where(eq(table.id, data.id)).get();
             if (existing) {
-                // Only update if remote is newer (optional conflict resolution, simple overwrite here)
-                // Mark as synced immediately since it came from cloud
                 await db.update(table).set({ ...data, syncStatus: 'synced' }).where(eq(table.id, data.id));
             } else {
                 await db.insert(table).values({ ...data, syncStatus: 'synced' });
@@ -175,6 +176,10 @@ export const syncService = {
         const matchesSnap = await getDocs(matchesQ);
         for (const doc of matchesSnap.docs) {
             const data = doc.data();
+            if (data.deleted) {
+                // Cascade: remove all local actions for this match too
+                await db.delete(matchActions).where(eq(matchActions.matchId, data.id));
+            }
             await upsertLocal(matches, data);
         }
 
