@@ -46,6 +46,7 @@ export default function LoginScreen() {
         style={{ width: '100%', marginBottom: 24 }}
         mode="outlined"
         secureTextEntry
+        autoCapitalize="none"
       />
 
       <Button mode="contained" onPress={handleLogin} style={{ width: '100%', paddingVertical: 4 }}>
