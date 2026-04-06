@@ -1,10 +1,15 @@
-import { Tabs } from 'expo-router';
+import { Tabs, Redirect } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
+import { useAuthStore } from '../../src/store/authStore';
 
 export default function AppLayout() {
   const theme = useTheme();
-  console.log("Renderizando App Layout Tabs");
+  const { user } = useAuthStore();
+
+  if (!user) {
+    return <Redirect href="/login" />;
+  }
 
   return (
     <Tabs
