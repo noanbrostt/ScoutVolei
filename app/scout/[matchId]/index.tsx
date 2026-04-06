@@ -7,6 +7,7 @@ import { matchService } from '../../../src/services/matchService';
 import { playerService } from '../../../src/services/playerService';
 import { syncService } from '../../../src/services/syncService';
 import * as NavigationBar from 'expo-navigation-bar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Actions Config
 const ACTIONS = [
@@ -98,15 +99,23 @@ export default function ScoutScreen() {
           await loadActions(id); // Await this to ensure recentActions are populated
           
           let activeIds: string[] = [];
-          if (initialLineup && typeof initialLineup === 'string') {
+
+          // 1. Tentar restaurar lineup salva (ao retornar para uma partida em andamento)
+          const savedLineup = await AsyncStorage.getItem(`lineup_${id}`);
+          if (savedLineup) {
+            try { activeIds = JSON.parse(savedLineup); } catch (e) {}
+          }
+
+          // 2. Fallback para o lineup enviado pela tela de setup (partida nova)
+          if (activeIds.length === 0 && initialLineup && typeof initialLineup === 'string') {
             try { activeIds = JSON.parse(initialLineup); } catch (e) {}
           }
-          
+
           let actives = [];
           if (activeIds.length > 0) {
             actives = p.filter(pl => activeIds.includes(pl.id));
           } else {
-             actives = p.slice(0, 7);
+            actives = p.slice(0, 7);
           }
 
           sortActivePlayers(actives);
@@ -178,6 +187,9 @@ export default function ScoutScreen() {
           return posA - posB;
       });
       setActivePlayers(sorted);
+      if (typeof matchId === 'string') {
+          AsyncStorage.setItem(`lineup_${matchId}`, JSON.stringify(sorted.map(p => p.id)));
+      }
   };
 
   const refreshMatch = async () => {
