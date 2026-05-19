@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 interface User {
   name: string;
   username: string;
-  role: 'admin' | 'atleta';
+  role: 'admin' | 'atleta' | 'tesoureiro';
 }
 
 interface AuthState {
@@ -30,6 +30,11 @@ export const useAuthStore = create<AuthState>()(
 
         if (u === 'atleta' && p === '123') {
           set({ user: { name: 'Atleta', username: 'atleta', role: 'atleta' } });
+          return true;
+        }
+
+        if (u === 'tesoureiro' && p === 'tesoureiro123') {
+          set({ user: { name: 'Tesoureiro', username: 'tesoureiro', role: 'tesoureiro' } });
           return true;
         }
 

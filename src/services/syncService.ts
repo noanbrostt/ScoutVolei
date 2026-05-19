@@ -1,7 +1,7 @@
 import { firestoreDb } from '../services/firebaseConfig';
 import { collection, doc, setDoc, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../database/db';
-import { teams, players, matches, matchActions } from '../database/schemas';
+import { teams, players, matches, matchActions, monthlyFeeConfig, payments, treasuryEvents, eventPayments } from '../database/schemas';
 import { eq, and } from 'drizzle-orm';
 import * as Network from 'expo-network';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -38,6 +38,10 @@ export const syncService = {
             await syncService.syncPlayers();
             await syncService.syncMatches();
             await syncService.syncMatchActions();
+            await syncService.syncMonthlyFeeConfig();
+            await syncService.syncPayments();
+            await syncService.syncTreasuryEvents();
+            await syncService.syncEventPayments();
 
             // 2. PULL: Get remote changes from Firestore
             await syncService.pullFromFirestore();
@@ -57,6 +61,10 @@ export const syncService = {
             { name: 'matches', table: matches, tsField: 'updatedAt' },
             { name: 'players', table: players, tsField: 'updatedAt' },
             { name: 'teams', table: teams, tsField: 'updatedAt' },
+            { name: 'monthlyFeeConfig', table: monthlyFeeConfig, tsField: 'updatedAt' },
+            { name: 'payments', table: payments, tsField: 'updatedAt' },
+            { name: 'treasuryEvents', table: treasuryEvents, tsField: 'updatedAt' },
+            { name: 'eventPayments', table: eventPayments, tsField: 'updatedAt' },
         ];
 
         for (const { name, table, tsField } of collections) {
@@ -130,6 +138,46 @@ export const syncService = {
         }
     },
 
+    syncMonthlyFeeConfig: async () => {
+        const rows = await db.select().from(monthlyFeeConfig).where(and(eq(monthlyFeeConfig.syncStatus, 'pending'), eq(monthlyFeeConfig.deleted, false)));
+        for (const row of rows) {
+            try {
+                await setDoc(doc(firestoreDb, 'monthlyFeeConfig', row.id), toFirestoreDoc(row), { merge: true });
+                await db.update(monthlyFeeConfig).set({ syncStatus: 'synced' }).where(eq(monthlyFeeConfig.id, row.id));
+            } catch (error) { console.error(`Failed to sync monthlyFeeConfig ${row.id}:`, error); }
+        }
+    },
+
+    syncPayments: async () => {
+        const rows = await db.select().from(payments).where(and(eq(payments.syncStatus, 'pending'), eq(payments.deleted, false)));
+        for (const row of rows) {
+            try {
+                await setDoc(doc(firestoreDb, 'payments', row.id), toFirestoreDoc(row), { merge: true });
+                await db.update(payments).set({ syncStatus: 'synced' }).where(eq(payments.id, row.id));
+            } catch (error) { console.error(`Failed to sync payment ${row.id}:`, error); }
+        }
+    },
+
+    syncTreasuryEvents: async () => {
+        const rows = await db.select().from(treasuryEvents).where(and(eq(treasuryEvents.syncStatus, 'pending'), eq(treasuryEvents.deleted, false)));
+        for (const row of rows) {
+            try {
+                await setDoc(doc(firestoreDb, 'treasuryEvents', row.id), toFirestoreDoc(row), { merge: true });
+                await db.update(treasuryEvents).set({ syncStatus: 'synced' }).where(eq(treasuryEvents.id, row.id));
+            } catch (error) { console.error(`Failed to sync treasuryEvent ${row.id}:`, error); }
+        }
+    },
+
+    syncEventPayments: async () => {
+        const rows = await db.select().from(eventPayments).where(and(eq(eventPayments.syncStatus, 'pending'), eq(eventPayments.deleted, false)));
+        for (const row of rows) {
+            try {
+                await setDoc(doc(firestoreDb, 'eventPayments', row.id), toFirestoreDoc(row), { merge: true });
+                await db.update(eventPayments).set({ syncStatus: 'synced' }).where(eq(eventPayments.id, row.id));
+            } catch (error) { console.error(`Failed to sync eventPayment ${row.id}:`, error); }
+        }
+    },
+
     // --- PULL METHODS (Cloud -> Local) ---
 
     pullFromFirestore: async () => {
@@ -189,6 +237,34 @@ export const syncService = {
         for (const doc of actionsSnap.docs) {
             const data = doc.data();
             await upsertLocal(matchActions, data);
+        }
+
+        // 5. Monthly fee configs
+        const feeConfigQ = query(collection(firestoreDb, 'monthlyFeeConfig'), where('updatedAt', '>', lastSyncDate.toISOString()));
+        const feeConfigSnap = await getDocs(feeConfigQ);
+        for (const docSnap of feeConfigSnap.docs) {
+            await upsertLocal(monthlyFeeConfig, docSnap.data());
+        }
+
+        // 6. Payments
+        const paymentsQ = query(collection(firestoreDb, 'payments'), where('updatedAt', '>', lastSyncDate.toISOString()));
+        const paymentsSnap = await getDocs(paymentsQ);
+        for (const docSnap of paymentsSnap.docs) {
+            await upsertLocal(payments, docSnap.data());
+        }
+
+        // 7. Treasury events
+        const teventsQ = query(collection(firestoreDb, 'treasuryEvents'), where('updatedAt', '>', lastSyncDate.toISOString()));
+        const teventsSnap = await getDocs(teventsQ);
+        for (const docSnap of teventsSnap.docs) {
+            await upsertLocal(treasuryEvents, docSnap.data());
+        }
+
+        // 8. Event payments
+        const epaymentsQ = query(collection(firestoreDb, 'eventPayments'), where('updatedAt', '>', lastSyncDate.toISOString()));
+        const epaymentsSnap = await getDocs(epaymentsQ);
+        for (const docSnap of epaymentsSnap.docs) {
+            await upsertLocal(eventPayments, docSnap.data());
         }
 
         // Update last sync time

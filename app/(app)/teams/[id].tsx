@@ -105,6 +105,7 @@ export default function TeamDetails() {
   if (!team && !loading) return <View className="flex-1 justify-center items-center"><Text>Time não encontrado</Text></View>;
 
   const isAdmin = user?.role === 'admin';
+  const canManagePlayers = user?.role === 'admin' || user?.role === 'tesoureiro';
 
   return (
     <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
@@ -158,7 +159,7 @@ export default function TeamDetails() {
             >
               <TouchableOpacity 
                 onPress={() => router.push({ pathname: '/(app)/teams/view-player', params: { playerId: item.id } })}
-                disabled={!isAdmin}
+                disabled={!canManagePlayers}
               >
                 <View className="flex-row items-center p-3">
                   {/* Info */}
@@ -171,8 +172,7 @@ export default function TeamDetails() {
                             <Icon source="cloud-upload" size={20} color="#F9A825" />
                         )}
                     </View>
-                    {/* Show full name only if admin OR if no surname exists */}
-                    {(isAdmin) && (
+                    {canManagePlayers && (
                         <Text variant="bodySmall" style={{ opacity: 0.7 }} numberOfLines={1} ellipsizeMode="tail">
                         {item.name}
                         </Text>
@@ -190,22 +190,22 @@ export default function TeamDetails() {
                       {item.position}
                     </Chip>
                     
-                    {/* Admin Player Actions */}
+                    {/* Player Actions */}
+                    {canManagePlayers && (
+                      <IconButton
+                        icon="pencil"
+                        size={20}
+                        onPress={() => router.push({ pathname: '/(app)/teams/edit-player', params: { playerId: item.id } })}
+                      />
+                    )}
                     {isAdmin && (
-                        <>
-            <IconButton 
-              icon="pencil" 
-              size={20} 
-              onPress={() => router.push({ pathname: '/(app)/teams/edit-player', params: { playerId: item.id } })} 
-            />
-                            <IconButton 
-                                icon="delete" 
-                                size={20} 
-                                iconColor={theme.colors.error}
-                                style={{ margin: 0, padding: 0 }}
-                                onPress={() => handleDeletePlayer(item.id)} 
-                            />
-                        </>
+                      <IconButton
+                        icon="delete"
+                        size={20}
+                        iconColor={theme.colors.error}
+                        style={{ margin: 0, padding: 0 }}
+                        onPress={() => handleDeletePlayer(item.id)}
+                      />
                     )}
                   </View>
                 </View>
@@ -215,8 +215,7 @@ export default function TeamDetails() {
         />
       </View>
 
-      {/* Admin FAB */}
-      {isAdmin && (
+      {canManagePlayers && (
         <FAB
             icon="account-plus"
             label="Novo Jogador"

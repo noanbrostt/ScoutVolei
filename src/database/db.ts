@@ -17,6 +17,8 @@ export const dbReady: Promise<void> = canUseSQLite
       if (Platform.OS === 'web') {
         await openDatabaseAsync('scoutvolei.db');
       }
-      db = drizzle(openDatabaseSync('scoutvolei.db'), { schema });
+      const rawDb = openDatabaseSync('scoutvolei.db');
+      rawDb.execSync('PRAGMA journal_mode=WAL;');
+      db = drizzle(rawDb, { schema });
     })()
   : new Promise(() => {}); // Never resolves — service worker will reload the page

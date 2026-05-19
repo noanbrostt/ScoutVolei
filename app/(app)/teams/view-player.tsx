@@ -89,7 +89,7 @@ export default function ViewPlayer() {
         <Appbar.BackAction onPress={() => router.back()} />
         <Appbar.Content title="Perfil do Atleta" style={{ alignItems: 'center' }} />
         {/* Empty view to balance the header if needed, or action button */}
-        {user?.role === 'admin' ? (
+        {(user?.role === 'admin' || user?.role === 'tesoureiro') ? (
             <Appbar.Action icon="pencil" onPress={() => router.push({ pathname: '/(app)/teams/edit-player', params: { playerId } })} />
         ) : <View style={{ width: 48 }} />}
       </Appbar.Header>
