@@ -182,7 +182,7 @@ export default function TeamMatches() {
           icon="plus"
           label="Novo Scout"
           style={{
-            position: 'absolute', margin: 16, right: 0, bottom: 0,
+            position: 'absolute', margin: 16, right: 0, bottom: 32,
             backgroundColor: theme.colors.primary,
           }}
           color="#FFF"

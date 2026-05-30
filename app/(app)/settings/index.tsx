@@ -25,7 +25,7 @@ export default function Profile() {
       router.replace('/');
   };
 
-  const handleSync = async () => {
+const handleSync = async () => {
       setSyncing(true);
       try {
         await syncService.syncAll();
@@ -87,7 +87,7 @@ export default function Profile() {
                 />
             </Card>
 
-            <Card mode="outlined" style={{ marginBottom: 12, backgroundColor: 'transparent', borderColor: theme.colors.outlineVariant }}>
+<Card mode="outlined" style={{ marginBottom: 12, backgroundColor: 'transparent', borderColor: theme.colors.outlineVariant }}>
                 <List.Item
                     title="Sincronizar Dados"
                     description={syncing ? "Sincronizando..." : "Enviar dados pendentes para a nuvem"}

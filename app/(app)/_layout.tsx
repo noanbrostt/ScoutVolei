@@ -6,7 +6,7 @@ import { useAuthStore } from '../../src/store/authStore';
 export default function AppLayout() {
   const theme = useTheme();
   const { user } = useAuthStore();
-  const canSeeTreasury = user?.role === 'admin' || user?.role === 'tesoureiro';
+  const canSeeTreasury = user?.role === 'admin' || user?.role === 'financeiro';
 
   if (!user) {
     return <Redirect href="/login" />;
@@ -43,8 +43,8 @@ export default function AppLayout() {
       <Tabs.Screen
         name="treasury"
         options={{
-          title: 'Tesouraria',
-          tabBarLabel: 'Tesouraria',
+          title: 'Financeiro',
+          tabBarLabel: 'Financeiro',
           href: canSeeTreasury ? undefined : null,
           tabBarIcon: ({ color }) => <MaterialIcons name="account-balance-wallet" size={24} color={color} />,
         }}

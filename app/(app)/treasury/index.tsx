@@ -36,6 +36,7 @@ type EventParcelaItem = {
   numeroParcela: number;
   totalParcelas: number;
   valorParcela: number;
+  valorPago: number | null;
   eventNome: string | null;
   eventTipo: string | null;
   inputValorPago: string;
@@ -46,7 +47,7 @@ export default function TreasuryIndex() {
   const theme = useTheme();
   const router = useRouter();
   const { user } = useAuthStore();
-  const isTesoureiro = user?.role === 'tesoureiro';
+  const isTesoureiro = user?.role === 'financeiro';
 
   // Teams
   const [allTeams, setAllTeams] = useState<any[]>([]);
@@ -244,17 +245,23 @@ export default function TreasuryIndex() {
     setModalJuros(String(p?.valorJuros ?? 0));
 
     const pendingParcelas = await treasuryService.getPendingEventParcelas(item.atleta.id);
-    setModalEventParcelas(pendingParcelas.map(ep => ({
-      id: ep.id,
-      eventoId: ep.eventoId,
-      numeroParcela: ep.numeroParcela,
-      totalParcelas: ep.totalParcelas,
-      valorParcela: ep.valorParcela,
-      eventNome: ep.eventNome,
-      eventTipo: ep.eventTipo,
-      inputValorPago: String(ep.valorParcela),
-      markedPaid: false,
-    })));
+    setModalEventParcelas(pendingParcelas.map(ep => {
+      const restante = ep.valorPago != null
+        ? parseFloat((ep.valorParcela - ep.valorPago).toFixed(2))
+        : ep.valorParcela;
+      return {
+        id: ep.id,
+        eventoId: ep.eventoId,
+        numeroParcela: ep.numeroParcela,
+        totalParcelas: ep.totalParcelas,
+        valorParcela: ep.valorParcela,
+        valorPago: ep.valorPago,
+        eventNome: ep.eventNome,
+        eventTipo: ep.eventTipo,
+        inputValorPago: String(restante),
+        markedPaid: false,
+      };
+    }));
 
     setModalVisible(true);
   };
@@ -316,15 +323,19 @@ export default function TreasuryIndex() {
       if (next) {
         setModalEventParcelas(prev => {
           if (prev.some(e => e.id === next.id)) return prev;
+          const restante = next.valorPago != null
+            ? parseFloat((next.valorParcela - next.valorPago).toFixed(2))
+            : next.valorParcela;
           const newItem = {
             id: next.id,
             eventoId: next.eventoId,
             numeroParcela: next.numeroParcela,
             totalParcelas: next.totalParcelas,
             valorParcela: next.valorParcela,
+            valorPago: next.valorPago,
             eventNome: next.eventNome,
             eventTipo: next.eventTipo,
-            inputValorPago: String(next.valorParcela),
+            inputValorPago: String(restante),
             markedPaid: false,
           };
           const idx = prev.findIndex(e => e.id === parcelaId);
@@ -355,7 +366,7 @@ export default function TreasuryIndex() {
       <Card
         mode="elevated"
         style={{ marginBottom: 8, backgroundColor: theme.colors.elevation.level1 }}
-        onPress={isPaid ? () => openModal(item) : undefined}
+        onPress={isTesoureiro ? () => openModal(item) : undefined}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12 }}>
           <View style={{
@@ -374,25 +385,25 @@ export default function TreasuryIndex() {
           </View>
 
           {isPaid ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <View style={{ alignItems: 'center', gap: 2 }}>
                 {pendingEvents && (
                   <View style={{
-                    backgroundColor: '#FF6F00', borderRadius: 8,
-                    paddingHorizontal: 6, paddingVertical: 1,
+                    backgroundColor: '#FF6F00', borderRadius: 10,
+                    width: 42, height: 18,
+                    justifyContent: 'center', alignItems: 'center',
                   }}>
-                    <Text style={{ color: '#fff', fontSize: 10 }}>⚡ {item.pendingEventCount}</Text>
+                    <Text style={{ color: '#fff', fontSize: 11 }}>⚡ {item.pendingEventCount}</Text>
                   </View>
                 )}
                 <View style={{
                   backgroundColor: sc.bg, borderRadius: 10,
-                  paddingHorizontal: 8, paddingVertical: 3,
+                  width: 42, height: 18,
+                  justifyContent: 'center', alignItems: 'center',
                 }}>
                   <Text style={{ color: sc.text, fontSize: 11 }}>{sc.label}</Text>
                 </View>
               </View>
-              <IconButton icon="pencil" size={14} style={{ margin: 0, width: 26, height: 26 }}
-                onPress={() => openModal(item)} />
             </View>
           ) : isTesoureiro ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -407,7 +418,7 @@ export default function TreasuryIndex() {
               <Chip
                 compact
                 mode="flat"
-                style={{ backgroundColor: theme.colors.primary, height: 32 }}
+                style={{ backgroundColor: theme.colors.primary, height: 32, width: 42 }}
                 textStyle={{ color: '#fff', fontSize: 16 }}
                 onPress={() => handleQuickPay(item)}
               >
@@ -479,8 +490,8 @@ export default function TreasuryIndex() {
       <SafeAreaView edges={['top']}>
         {/* Title */}
         <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 }}>
-          <Text variant="headlineMedium" style={{ fontWeight: 'bold', color: theme.colors.primary, flex: 1 }}>
-            Tesouraria
+          <Text variant="displaySmall" style={{ fontWeight: 'bold', color: theme.colors.primary, flex: 1 }}>
+            Financeiro
           </Text>
           <Menu
             visible={menuVisible}
@@ -537,7 +548,7 @@ export default function TreasuryIndex() {
         {tab === 'mensalidades' && (
           <>
             {/* Month navigator */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: -2 }}>
               <IconButton icon="chevron-left" size={20} onPress={() => adjustMonth(-1)} />
               <TouchableOpacity
                 onPress={() => { setPickerYear(monthDate.getFullYear()); setMonthPickerVisible(true); }}
@@ -575,17 +586,19 @@ export default function TreasuryIndex() {
             : athletes}
           keyExtractor={item => item.atleta.id}
           renderItem={renderAthlete}
-          contentContainerStyle={{ padding: 16, paddingTop: 8, paddingBottom: 80 }}
+          contentContainerStyle={{ padding: 16, paddingTop: 8 }}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={() => loadAthletes(selectedTeamIds)} />}
           ListHeaderComponent={
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <IconButton icon="minus" size={16} style={{ margin: 0 }} onPress={() => adjustPayDate(-1)} />
-                <Chip compact onPress={() => setShowPayDatePicker(true)} icon="calendar">
-                  {formatDate(payDate)}
-                </Chip>
-                <IconButton icon="plus" size={16} style={{ margin: 0 }} onPress={() => adjustPayDate(1)} />
-              </View>
+              {isTesoureiro ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <IconButton icon="minus" size={16} style={{ margin: 0 }} onPress={() => adjustPayDate(-1)} />
+                  <Chip compact onPress={() => setShowPayDatePicker(true)} icon="calendar">
+                    {formatDate(payDate)}
+                  </Chip>
+                  <IconButton icon="plus" size={16} style={{ margin: 0 }} onPress={() => adjustPayDate(1)} />
+                </View>
+              ) : <View />}
               <Chip
                 compact
                 selected={hidePaid}
@@ -777,6 +790,7 @@ export default function TreasuryIndex() {
                           <Text variant="bodySmall" style={{ fontWeight: 'bold' }}>{ep.eventNome}</Text>
                           <Text variant="bodySmall" style={{ opacity: 0.6 }}>
                             Parcela {ep.numeroParcela}/{ep.totalParcelas} · R$ {ep.valorParcela.toFixed(2)}
+                            {ep.valorPago != null ? ` · pago R$ ${ep.valorPago.toFixed(2)}` : ''}
                           </Text>
                         </View>
                         <PaperInput

@@ -1,6 +1,6 @@
 import { db } from '../database/db';
 import { monthlyFeeConfig, payments, treasuryEvents, eventPayments, players, teams } from '../database/schemas';
-import { eq, and, inArray, asc, isNull } from 'drizzle-orm';
+import { eq, and, inArray, asc, isNull, or, isNotNull, lt } from 'drizzle-orm';
 import * as Crypto from 'expo-crypto';
 
 export const treasuryService = {
@@ -67,7 +67,10 @@ export const treasuryService = {
       .where(and(
         inArray(eventPayments.atletaId, atletaIds),
         eq(eventPayments.deleted, false),
-        isNull(eventPayments.dataPagamento),
+        or(
+          isNull(eventPayments.dataPagamento),
+          and(isNotNull(eventPayments.valorPago), lt(eventPayments.valorPago, eventPayments.valorParcela)),
+        ),
       ));
     const eventPendingCount = new Map<string, number>();
     const byAthlete = new Map<string, Set<string>>();
@@ -158,7 +161,7 @@ export const treasuryService = {
       .where(eq(payments.id, id));
   },
 
-  // Returns the first pending parcela per event for a given athlete (for modal display)
+  // Returns the first pending/partial parcela per event for a given athlete (for modal display)
   getPendingEventParcelas: async (atletaId: string) => {
     const rows = await db.select({
       id: eventPayments.id,
@@ -166,6 +169,7 @@ export const treasuryService = {
       numeroParcela: eventPayments.numeroParcela,
       totalParcelas: eventPayments.totalParcelas,
       valorParcela: eventPayments.valorParcela,
+      valorPago: eventPayments.valorPago,
       eventNome: treasuryEvents.nome,
       eventTipo: treasuryEvents.tipo,
     }).from(eventPayments)
@@ -173,7 +177,10 @@ export const treasuryService = {
       .where(and(
         eq(eventPayments.atletaId, atletaId),
         eq(eventPayments.deleted, false),
-        isNull(eventPayments.dataPagamento),
+        or(
+          isNull(eventPayments.dataPagamento),
+          and(isNotNull(eventPayments.valorPago), lt(eventPayments.valorPago, eventPayments.valorParcela)),
+        ),
       ))
       .orderBy(asc(eventPayments.eventoId), asc(eventPayments.numeroParcela));
 

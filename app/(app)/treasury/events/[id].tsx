@@ -13,7 +13,7 @@ export default function EventDetail() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuthStore();
-  const isTesoureiro = user?.role === 'tesoureiro';
+  const isTesoureiro = user?.role === 'financeiro';
 
   const [data, setData] = useState<Awaited<ReturnType<typeof treasuryService.getEventAthletes>>>(null);
 

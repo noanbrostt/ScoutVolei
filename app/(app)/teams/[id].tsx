@@ -105,7 +105,7 @@ export default function TeamDetails() {
   if (!team && !loading) return <View className="flex-1 justify-center items-center"><Text>Time não encontrado</Text></View>;
 
   const isAdmin = user?.role === 'admin';
-  const canManagePlayers = user?.role === 'admin' || user?.role === 'tesoureiro';
+  const canManagePlayers = user?.role === 'admin' || user?.role === 'financeiro';
 
   return (
     <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
