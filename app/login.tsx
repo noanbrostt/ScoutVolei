@@ -35,7 +35,7 @@ export default function LoginScreen() {
         {/* Logo + title */}
         <View style={{ alignItems: 'center', marginBottom: 32 }}>
           <Image
-            source={require('../assets/icon.png')}
+            source={require('../assets/icon.jpg')}
             style={{ width: 88, height: 88, borderRadius: 24, marginBottom: 18, ...(fin.shadow === 'transparent' ? {} : { shadowColor: '#14213B', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 }) }}
             resizeMode="cover"
           />
