@@ -1,18 +1,38 @@
 import { View, ScrollView } from 'react-native';
-import { Text, Appbar, useTheme, Card, Divider, Avatar, Chip, Surface, Icon } from 'react-native-paper';
+import { Text } from 'react-native-paper';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useState, useCallback, useEffect } from 'react';
 import { playerService } from '../../../src/services/playerService';
 import { syncService } from '../../../src/services/syncService';
 import { useAuthStore } from '../../../src/store/authStore';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFin } from '../../../src/theme';
+import { ScreenHeader, IconBtn, Avatar, cardShadow } from '../../../src/components/ui';
+
+const calculateAge = (dateString?: string) => {
+  if (!dateString) return null;
+  let birthDate: Date;
+  if (dateString.includes('/')) {
+    const [d, m, y] = dateString.split('/');
+    birthDate = new Date(`${y}-${m}-${d}`);
+  } else {
+    birthDate = new Date(dateString);
+  }
+  if (isNaN(birthDate.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const mo = today.getMonth() - birthDate.getMonth();
+  if (mo < 0 || (mo === 0 && today.getDate() < birthDate.getDate())) age--;
+  return age;
+};
 
 export default function ViewPlayer() {
   const router = useRouter();
   const { playerId } = useLocalSearchParams();
-  const theme = useTheme();
-  const user = useAuthStore(s => s.user); // Get user
-  
+  const fin = useFin();
+  const user = useAuthStore(s => s.user);
+  const canEdit = user?.role === 'admin' || user?.role === 'financeiro';
+
   const [player, setPlayer] = useState<any>(null);
 
   const loadPlayer = async () => {
@@ -22,192 +42,89 @@ export default function ViewPlayer() {
     }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      loadPlayer();
-    }, [playerId])
-  );
+  useFocusEffect(useCallback(() => { loadPlayer(); }, [playerId]));
 
   useEffect(() => {
-    const unsubscribe = syncService.subscribe(() => {
-      loadPlayer();
-    });
+    const unsubscribe = syncService.subscribe(() => { loadPlayer(); });
     return () => unsubscribe();
   }, [playerId]);
 
-  if (!player) return <View className="flex-1" style={{ backgroundColor: theme.colors.background }} />;
-
-  const calculateAge = (dateString?: string) => {
-    if (!dateString) return null;
-    // Tries to handle DD/MM/YYYY or YYYY-MM-DD
-    let birthDate;
-    if (dateString.includes('/')) {
-        const parts = dateString.split('/');
-        // Assuming PT-BR format DD/MM/YYYY
-        birthDate = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-    } else {
-        birthDate = new Date(dateString);
-    }
-    
-    if (isNaN(birthDate.getTime())) return null;
-
-    const today = new Date();
-    let age = today.getFullYear() - birthDate.getFullYear();
-    const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-    }
-    return age;
-  };
+  if (!player) return <View style={{ flex: 1, backgroundColor: fin.bg }} />;
 
   const age = calculateAge(player.birthday);
 
-  const StatBox = ({ icon, label, value, subLabel }: { icon: string, label: string, value: string | number, subLabel?: string }) => (
-    <Surface 
-        style={{ 
-            flex: 1, 
-            padding: 12, 
-            borderRadius: 12, 
-            backgroundColor: theme.colors.surface, // Use surface color for card
-            alignItems: 'center',
-            marginHorizontal: 4,
-            elevation: 2
-        }}
-    >
-        <Icon source={icon} size={24} color={theme.colors.primary} />
-        <Text variant="titleLarge" style={{ fontWeight: 'bold', marginTop: 8, color: theme.colors.onSurface }}>
-            {value}
-            {subLabel && <Text variant="bodySmall" style={{ fontSize: 12 }}> {subLabel}</Text>}
-        </Text>
-        <Text variant="bodySmall" style={{ opacity: 0.6, marginTop: 2, textAlign: 'center' }}>{label}</Text>
-    </Surface>
+  const DataField = ({ label, value }: { label: string; value: string }) => (
+    <View style={{ flex: 1 }}>
+      <Text style={{ fontSize: 11, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase', color: fin.sub }}>{label}</Text>
+      <Text style={{ fontSize: 15.5, fontWeight: '700', color: fin.ink, marginTop: 3 }}>{value}</Text>
+    </View>
   );
 
   return (
-    <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-      <Appbar.Header style={{ backgroundColor: theme.colors.background }} elevated={false}>
-        <Appbar.BackAction onPress={() => router.back()} />
-        <Appbar.Content title="Perfil do Atleta" style={{ alignItems: 'center' }} />
-        {/* Empty view to balance the header if needed, or action button */}
-        {(user?.role === 'admin' || user?.role === 'financeiro') ? (
-            <Appbar.Action icon="pencil" onPress={() => router.push({ pathname: '/(app)/teams/edit-player', params: { playerId } })} />
-        ) : <View style={{ width: 48 }} />}
-      </Appbar.Header>
+    <View style={{ flex: 1, backgroundColor: fin.bg }}>
+      <ScreenHeader
+        title="Perfil do atleta"
+        onBack={() => router.back()}
+        fin={fin}
+        right={canEdit ? <IconBtn icon="edit" fin={fin} onPress={() => router.push({ pathname: '/(app)/teams/edit-player', params: { playerId } })} /> : undefined}
+      />
 
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        
-        {/* Hero Section */}
-        <View style={{ alignItems: 'center', paddingTop: 10, paddingBottom: 24 }}>
-            <View style={{ position: 'relative' }}>
-                <Avatar.Text 
-                    size={110} 
-                    label={player.name.substring(0,2).toUpperCase()} 
-                    style={{ backgroundColor: theme.colors.primary }}
-                    color="#FFF"
-                    labelStyle={{ fontSize: 40, fontWeight: 'bold' }}
-                />
-                {player.syncStatus === 'pending' && (
-                    <View style={{ 
-                        position: 'absolute', 
-                        bottom: 0, 
-                        right: 0, 
-                        backgroundColor: theme.colors.surface, 
-                        borderRadius: 20, 
-                        padding: 4,
-                        elevation: 4 
-                    }}>
-                        <Icon source="cloud-upload" size={24} color="#F9A825" />
-                    </View>
-                )}
-            </View>
-
-            <Text variant="headlineMedium" style={{ fontWeight: 'bold', marginTop: 16, textAlign: 'center' }}>
-                {player.name}
-            </Text>
-            {player.surname && (
-                <Text variant="titleMedium" style={{ opacity: 0.6, marginTop: -4 }}>
-                    "{player.surname}"
-                </Text>
+        {/* Hero */}
+        <View style={{ alignItems: 'center', paddingTop: 8, paddingBottom: 24 }}>
+          <View>
+            <Avatar name={player.name} color={fin.brand} size={110} fontSize={40} fin={fin} />
+            {player.syncStatus === 'pending' && (
+              <View style={{ position: 'absolute', bottom: 0, right: 0, backgroundColor: fin.surface, borderRadius: 16, padding: 4, ...cardShadow(fin) }}>
+                <MaterialIcons name="cloud-upload" size={22} color={fin.warn} />
+              </View>
             )}
+          </View>
 
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
-                <Chip 
-                    mode="flat" 
-                    textStyle={{ color: theme.colors.onPrimary, fontWeight: 'bold' }}
-                    style={{ backgroundColor: theme.colors.primary, height: 32 }}
-                >
-                    {player.position.toUpperCase()}
-                </Chip>
-                {player.number && (
-                    <Chip 
-                        mode="outlined" 
-                        textStyle={{ fontWeight: 'bold' }}
-                        style={{ borderColor: theme.colors.outline, height: 32 }}
-                    >
-                        #{player.number}
-                    </Chip>
-                )}
+          <Text style={{ fontWeight: '800', fontSize: 24, color: fin.ink, marginTop: 16, textAlign: 'center', letterSpacing: -0.3 }}>{player.name}</Text>
+          {!!player.surname && <Text style={{ fontSize: 15, color: fin.sub, fontWeight: '600', marginTop: 2 }}>"{player.surname}"</Text>}
+
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+            <View style={{ backgroundColor: fin.brand, borderRadius: 20, paddingVertical: 6, paddingHorizontal: 14 }}>
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>{player.position?.toUpperCase()}</Text>
             </View>
+            {!!player.number && (
+              <View style={{ borderWidth: 1.5, borderColor: fin.line, borderRadius: 20, paddingVertical: 6, paddingHorizontal: 14 }}>
+                <Text style={{ color: fin.ink, fontWeight: '800', fontSize: 13 }}>#{player.number}</Text>
+              </View>
+            )}
+          </View>
         </View>
 
-        {/* Personal Info Section */}
+        {/* Personal data */}
         <View style={{ paddingHorizontal: 16 }}>
-            <Text variant="titleMedium" style={{ fontWeight: 'bold', marginBottom: 12, opacity: 0.8 }}>
-                Dados Pessoais
-            </Text>
-            <Surface style={{ borderRadius: 12, backgroundColor: theme.colors.surfaceVariant, padding: 16 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-                    <View style={{ flex: 1 }}>
-                        <Text variant="labelMedium" style={{ opacity: 0.6 }}>Data de Nascimento</Text>
-                        <Text variant="bodyLarge">{player.birthday || '-'}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                        <Text variant="labelMedium" style={{ opacity: 0.6 }}>Idade</Text>
-                        <Text variant="bodyLarge">
-                            {age !== null ? `${age} anos` : '-'}
-                        </Text>
-                    </View>
-                </View>
-                <Divider style={{ backgroundColor: theme.colors.outline, opacity: 0.2, marginVertical: 8 }} />
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <View style={{ flex: 1 }}>
-                        <Text variant="labelMedium" style={{ opacity: 0.6 }}>RG</Text>
-                        <Text variant="bodyLarge">{player.rg || '-'}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                        <Text variant="labelMedium" style={{ opacity: 0.6 }}>CPF</Text>
-                        <Text variant="bodyLarge">{player.cpf || '-'}</Text>
-                    </View>
-                </View>
-            </Surface>
+          <Text style={{ fontSize: 12.5, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase', color: fin.sub, marginBottom: 10 }}>Dados pessoais</Text>
+          <View style={{ backgroundColor: fin.surface, borderRadius: 16, padding: 16, ...cardShadow(fin) }}>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <DataField label="Nascimento" value={player.birthday || '—'} />
+              <DataField label="Idade" value={age !== null ? `${age} anos` : '—'} />
+            </View>
+            <View style={{ height: 1, backgroundColor: fin.line, marginVertical: 14 }} />
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <DataField label="RG" value={player.rg || '—'} />
+              <DataField label="CPF" value={player.cpf || '—'} />
+            </View>
+          </View>
         </View>
 
-        {/* Medical Section (Only if content exists) */}
-        {player.allergies && (
-            <View style={{ paddingHorizontal: 16, marginTop: 24 }}>
-                <Text variant="titleMedium" style={{ fontWeight: 'bold', marginBottom: 12, opacity: 0.8 }}>
-                    Observações Médicas
-                </Text>
-                <Surface style={{ 
-                    borderRadius: 12, 
-                    backgroundColor: theme.colors.tertiaryContainer, // Changed to a warning-like or tertiary tone
-                    padding: 16,
-                    borderLeftWidth: 4,
-                    borderLeftColor: theme.colors.tertiary 
-                }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-                        <Icon source="alert-circle" size={20} color={theme.colors.tertiary} />
-                        <Text variant="titleSmall" style={{ color: theme.colors.tertiary, fontWeight: 'bold', marginLeft: 8 }}>
-                            AVISO
-                        </Text>
-                    </View>
-                    <Text variant="bodyMedium" style={{ color: theme.colors.onTertiaryContainer }}>
-                        {player.allergies}
-                    </Text>
-                </Surface>
+        {/* Medical */}
+        {!!player.allergies && (
+          <View style={{ paddingHorizontal: 16, marginTop: 22 }}>
+            <Text style={{ fontSize: 12.5, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase', color: fin.sub, marginBottom: 10 }}>Observações médicas</Text>
+            <View style={{ backgroundColor: fin.warnSoft, borderRadius: 16, padding: 16, borderLeftWidth: 4, borderLeftColor: fin.warn }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                <MaterialIcons name="error-outline" size={18} color={fin.warn} />
+                <Text style={{ color: fin.warn, fontWeight: '800', fontSize: 12.5, letterSpacing: 0.3 }}>AVISO</Text>
+              </View>
+              <Text style={{ color: fin.ink, fontSize: 14, fontWeight: '600', lineHeight: 20 }}>{player.allergies}</Text>
             </View>
+          </View>
         )}
-
       </ScrollView>
     </View>
   );

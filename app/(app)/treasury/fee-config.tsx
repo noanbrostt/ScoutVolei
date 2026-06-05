@@ -1,16 +1,19 @@
-import { View, ScrollView } from 'react-native';
-import { Text, TextInput, Button, useTheme, Appbar, Divider } from 'react-native-paper';
+import { View, ScrollView, Pressable } from 'react-native';
+import { Text } from 'react-native-paper';
+import { MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { teamService } from '../../../src/services/teamService';
 import { treasuryService } from '../../../src/services/treasuryService';
 import { syncService } from '../../../src/services/syncService';
+import { useFin } from '../../../src/theme';
+import { cardShadow, FieldLabel, FieldPill } from '../../../src/components/treasury/finance-ui';
 
 type TeamConfig = { valorBase: string };
 
 export default function FeeConfig() {
-  const theme = useTheme();
+  const fin = useFin();
   const router = useRouter();
   const [teams, setTeams] = useState<any[]>([]);
   const [configs, setConfigs] = useState<Record<string, TeamConfig>>({});
@@ -49,52 +52,49 @@ export default function FeeConfig() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <View style={{ flex: 1, backgroundColor: fin.bg }}>
       <SafeAreaView edges={['top']}>
-        <Appbar.Header statusBarHeight={0} style={{ backgroundColor: 'transparent', elevation: 0 }}>
-          <Appbar.BackAction onPress={() => router.back()} />
-          <Appbar.Content title="Valor da Mensalidade" />
-        </Appbar.Header>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 8 }}>
+          <Pressable onPress={() => router.back()} hitSlop={8}>
+            <MaterialIcons name="arrow-back" size={24} color={fin.ink} />
+          </Pressable>
+          <Text style={{ fontWeight: '800', fontSize: 19, color: fin.ink, letterSpacing: -0.3 }}>Valor da mensalidade</Text>
+        </View>
       </SafeAreaView>
 
-      <ScrollView contentContainerStyle={{ padding: 16 }} keyboardShouldPersistTaps="handled">
-        <Text variant="bodySmall" style={{ opacity: 0.6, marginBottom: 20 }}>
-          Configure o valor base da mensalidade por time. Alterado normalmente 1x ao ano.
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
+        <Text style={{ fontSize: 13, color: fin.sub, fontWeight: '600', marginBottom: 16 }}>
+          Configure o valor base da mensalidade por time. Normalmente alterado 1× ao ano.
         </Text>
 
-        {teams.map((team, index) => (
-          <View key={team.id}>
-            {index > 0 && <Divider style={{ marginVertical: 16 }} />}
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
-              <View style={{
-                width: 12, height: 12, borderRadius: 6,
-                backgroundColor: team.color,
-                marginRight: 8,
-              }} />
-              <Text variant="titleSmall" style={{ fontWeight: 'bold' }}>{team.name}</Text>
+        {teams.map(team => (
+          <View
+            key={team.id}
+            style={{ backgroundColor: fin.surface, borderRadius: 14, padding: 14, marginBottom: 12, ...cardShadow(fin) }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: team.color }} />
+              <Text style={{ fontWeight: '800', fontSize: 16, color: fin.ink, letterSpacing: -0.2 }}>{team.name}</Text>
             </View>
-            <TextInput
-              label="Mensalidade (R$)"
+            <FieldLabel fin={fin}>Mensalidade</FieldLabel>
+            <FieldPill
+              fin={fin}
               value={configs[team.id]?.valorBase ?? ''}
-              onChangeText={val =>
-                setConfigs(prev => ({ ...prev, [team.id]: { ...prev[team.id], valorBase: val } }))
-              }
-              mode="outlined"
+              onChangeText={val => setConfigs(prev => ({ ...prev, [team.id]: { ...prev[team.id], valorBase: val } }))}
+              prefix="R$"
+              placeholder="0"
               keyboardType="decimal-pad"
-              placeholder="Ex: 40,00"
             />
           </View>
         ))}
 
-        <Button
-          mode="contained"
+        <Pressable
           onPress={handleSave}
-          loading={saving}
           disabled={saving}
-          style={{ marginTop: 28 }}
+          style={{ marginTop: 12, backgroundColor: fin.brand, borderRadius: 14, paddingVertical: 14, alignItems: 'center', opacity: saving ? 0.6 : 1 }}
         >
-          Salvar
-        </Button>
+          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>{saving ? '...' : 'Salvar'}</Text>
+        </Pressable>
       </ScrollView>
     </View>
   );

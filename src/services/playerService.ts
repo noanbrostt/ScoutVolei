@@ -73,7 +73,8 @@ export const playerService = {
   getBirthdaysByMonth: async (month: number) => {
     const allPlayers = await db.select({
         player: players,
-        teamName: teams.name
+        teamName: teams.name,
+        teamColor: teams.color
     })
     .from(players)
     .leftJoin(teams, eq(players.teamId, teams.id))

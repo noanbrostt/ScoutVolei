@@ -1,33 +1,23 @@
-import { View, ScrollView, FlatList, RefreshControl, Platform, Alert, TouchableOpacity } from 'react-native';
-import { Text, Chip, SegmentedButtons, useTheme, Card, FAB, IconButton, Portal, Modal, Menu, Dialog, Divider } from 'react-native-paper';
-import { TextInput as PaperInput } from 'react-native-paper';
+import { View, ScrollView, FlatList, RefreshControl, Alert, Pressable } from 'react-native';
+import { Text, useTheme, IconButton, Portal, Modal, Menu, Dialog, Divider } from 'react-native-paper';
+import { MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect, useRouter } from 'expo-router';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuthStore } from '../../../src/store/authStore';
 import { teamService } from '../../../src/services/teamService';
 import { treasuryService } from '../../../src/services/treasuryService';
 import { syncService } from '../../../src/services/syncService';
+import { useFin, FinTokens } from '../../../src/theme';
+import {
+  money, toIsoDate, isoToShort,
+  cardShadow, Avatar, Ring, DateStepper, IconBtn, Tabs, FieldLabel, FieldPill,
+} from '../../../src/components/treasury/finance-ui';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TEAMS_STORAGE_KEY = 'treasury_selected_teams';
 
 type Tab = 'mensalidades' | 'eventos';
-
-const toIsoDate = (date: Date) =>
-  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-
-const formatDate = (date: Date) => {
-  const d = String(date.getDate()).padStart(2, '0');
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  return `${d}/${m}/${date.getFullYear()}`;
-};
-
-const formatDisplayDate = (isoDate: string) => {
-  const [y, m, d] = isoDate.split('-');
-  return `${d}/${m}/${y}`;
-};
 
 type AthleteItem = Awaited<ReturnType<typeof treasuryService.getMonthlyAthletes>>[number];
 type EventParcelaItem = {
@@ -43,8 +33,102 @@ type EventParcelaItem = {
   markedPaid: boolean;
 };
 
+// Memoized so opening the modal / stepping the date doesn't re-render every card.
+const AthleteRow = memo(function AthleteRow({
+  item, fin, feeConfigs, isTesoureiro, onOpen, onQuickPay,
+}: {
+  item: AthleteItem;
+  fin: FinTokens;
+  feeConfigs: Map<string, any>;
+  isTesoureiro: boolean;
+  onOpen: (item: AthleteItem) => void;
+  onQuickPay: (item: AthleteItem) => void;
+}) {
+  const p = item.currentPayment;
+  const status: 'nao_pago' | 'pago' | 'parcial' =
+    !p || !p.dataPagamento ? 'nao_pago'
+    : (p.valorPago != null && p.valorPago < p.valorBase) ? 'parcial' : 'pago';
+  const team = item.team;
+  const color = team?.color ?? fin.brand;
+  const name = item.atleta.surname?.trim() || item.atleta.name;
+  const base = p?.valorBase ?? feeConfigs.get(item.atleta.teamId)?.valorBase ?? 0;
+  const payDateStr = p?.dataPagamento ? isoToShort(p.dataPagamento) : '';
+
+  return (
+    <Pressable
+      onPress={isTesoureiro ? () => onOpen(item) : undefined}
+      style={{
+        flexDirection: 'row', alignItems: 'center', gap: 11,
+        backgroundColor: fin.surface, borderRadius: 14,
+        paddingTop: 12, paddingRight: 13, paddingBottom: 12, paddingLeft: 15,
+        marginBottom: 9, overflow: 'hidden', ...cardShadow(fin),
+      }}
+    >
+      <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: color }} />
+      <Avatar name={name} color={color} fin={fin} />
+
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text numberOfLines={1} style={{ fontWeight: '800', fontSize: 18, color: fin.ink, letterSpacing: -0.2 }}>
+          {name}
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: color }} />
+            <Text style={{ fontSize: 12.5, color: fin.sub, fontWeight: '600' }}>{team?.name ?? ''}</Text>
+          </View>
+          {item.pendingEventCount > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2, backgroundColor: fin.brandSoft, paddingVertical: 2, paddingHorizontal: 7, borderRadius: 6 }}>
+              <MaterialIcons name="bolt" size={12} color={fin.brand} />
+              <Text style={{ fontSize: 11.5, fontWeight: '700', color: fin.brand }}>
+                {item.pendingEventCount} evento{item.pendingEventCount > 1 ? 's' : ''}
+              </Text>
+            </View>
+          )}
+          {item.overdueCount > 0 && (
+            <View style={{ backgroundColor: fin.warnSoft, paddingVertical: 2, paddingHorizontal: 7, borderRadius: 6 }}>
+              <Text style={{ fontSize: 11.5, fontWeight: '700', color: fin.warn }}>{item.overdueCount} em atraso</Text>
+            </View>
+          )}
+        </View>
+      </View>
+
+      {status === 'pago' ? (
+        <View style={{ alignItems: 'center', gap: 4 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: fin.goodSoft, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20 }}>
+            <MaterialIcons name="check" size={15} color={fin.good} />
+            <Text style={{ fontWeight: '800', fontSize: 13, color: fin.good }}>Pago</Text>
+          </View>
+          {!!payDateStr && <Text style={{ fontSize: 11, color: fin.sub, fontWeight: '600' }}>{payDateStr}</Text>}
+        </View>
+      ) : isTesoureiro ? (
+        <View style={{ alignItems: 'flex-end', gap: 6 }}>
+          {status === 'parcial' && (
+            <View style={{ alignItems: 'flex-end' }}>
+              <View style={{ backgroundColor: fin.warnSoft, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 14 }}>
+                <Text style={{ fontWeight: '800', fontSize: 13.5, color: fin.warn, fontVariant: ['tabular-nums'] }}>
+                  {money(p?.valorPago ?? 0)}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 10.5, color: fin.sub, fontWeight: '600', marginTop: 3 }}>de {money(base)}</Text>
+            </View>
+          )}
+          <Pressable
+            onPress={() => onQuickPay(item)}
+            style={{ backgroundColor: fin.brand, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20 }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13.5 }}>
+              {status === 'parcial' ? 'Quitar' : 'Pagar'}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+});
+
 export default function TreasuryIndex() {
   const theme = useTheme();
+  const fin = useFin();
   const router = useRouter();
   const { user } = useAuthStore();
   const isTesoureiro = user?.role === 'financeiro';
@@ -54,11 +138,9 @@ export default function TreasuryIndex() {
   const [selectedTeamIds, setSelectedTeamIds] = useState<Set<string>>(new Set());
   const [feeConfigs, setFeeConfigs] = useState<Map<string, any>>(new Map());
 
-  // Header menu
+  // Header menu / pickers
   const [menuVisible, setMenuVisible] = useState(false);
   const [teamPickerVisible, setTeamPickerVisible] = useState(false);
-
-  // Month picker
   const [monthPickerVisible, setMonthPickerVisible] = useState(false);
   const [pickerYear, setPickerYear] = useState(new Date().getFullYear());
 
@@ -72,18 +154,16 @@ export default function TreasuryIndex() {
 
   // Shared payment date
   const [payDate, setPayDate] = useState(new Date());
-  const [showPayDatePicker, setShowPayDatePicker] = useState(false);
 
   // Data
   const [athletes, setAthletes] = useState<AthleteItem[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Modal
+  // Payment modal (detailed editor — opened by tapping a card)
   const [modalVisible, setModalVisible] = useState(false);
   const [modalItem, setModalItem] = useState<AthleteItem | null>(null);
   const [modalDate, setModalDate] = useState(new Date());
-  const [showModalDatePicker, setShowModalDatePicker] = useState(false);
   const [modalValorPago, setModalValorPago] = useState('');
   const [modalSolidario, setModalSolidario] = useState('0');
   const [modalJuros, setModalJuros] = useState('0');
@@ -92,6 +172,10 @@ export default function TreasuryIndex() {
 
   const mesReferencia = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
   const monthLabel = (() => {
+    const s = monthDate.toLocaleString('pt-BR', { month: 'long' });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  })();
+  const monthLabelFull = (() => {
     const s = monthDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
     return s.charAt(0).toUpperCase() + s.slice(1);
   })();
@@ -130,7 +214,7 @@ export default function TreasuryIndex() {
     setFeeConfigs(map);
   };
 
-  const loadAthletes = async (teamIds: Set<string>) => {
+  const loadAthletes = useCallback(async (teamIds: Set<string>) => {
     if (teamIds.size === 0) { setAthletes([]); return; }
     setLoading(true);
     try {
@@ -139,7 +223,7 @@ export default function TreasuryIndex() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [mesReferencia]);
 
   const loadEvents = async () => {
     setLoading(true);
@@ -156,9 +240,7 @@ export default function TreasuryIndex() {
     if (tab === 'eventos') loadEvents();
   }, [tab]));
 
-  useEffect(() => {
-    loadFeeConfigs(selectedTeamIds);
-  }, [selectedTeamIds]);
+  useEffect(() => { loadFeeConfigs(selectedTeamIds); }, [selectedTeamIds]);
 
   useEffect(() => {
     if (!teamsInitialized.current) return;
@@ -187,11 +269,11 @@ export default function TreasuryIndex() {
     });
   };
 
-  const adjustMonth = (delta: number) =>
-    setMonthDate(d => new Date(d.getFullYear(), d.getMonth() + delta, 1));
+  const adjustMonth = useCallback((delta: number) =>
+    setMonthDate(d => new Date(d.getFullYear(), d.getMonth() + delta, 1)), []);
 
-  const adjustPayDate = (delta: number) =>
-    setPayDate(d => { const n = new Date(d); n.setDate(n.getDate() + delta); return n; });
+  const adjustPayDate = useCallback((delta: number) =>
+    setPayDate(d => { const n = new Date(d); n.setDate(n.getDate() + delta); return n; }), []);
 
   const getPaymentStatus = (item: AthleteItem): 'nao_pago' | 'pago' | 'parcial' => {
     const p = item.currentPayment;
@@ -200,11 +282,13 @@ export default function TreasuryIndex() {
     return 'pago';
   };
 
-  // ── Quick pay ─────────────────────────────────────────────────────────────
+  // ── Quick pay (full value on payDate; "Quitar" completes a partial) ─────────
 
-  const handleQuickPay = async (item: AthleteItem) => {
+  const handleQuickPay = useCallback(async (item: AthleteItem) => {
     const feeConfig = feeConfigs.get(item.atleta.teamId);
-    if (!feeConfig) {
+    const p = item.currentPayment;
+    const base = p?.valorBase ?? feeConfig?.valorBase;
+    if (base == null) {
       Alert.alert(
         'Mensalidade não configurada',
         `Configure o valor da mensalidade do time "${item.team?.name}" primeiro.`,
@@ -216,55 +300,51 @@ export default function TreasuryIndex() {
       return;
     }
     await treasuryService.savePayment({
-      id: item.currentPayment?.id,
+      id: p?.id,
       atletaId: item.atleta.id,
       teamId: item.atleta.teamId,
       mesReferencia,
-      valorBase: feeConfig.valorBase,
-      valorSolidario: 0,
-      valorJuros: 0,
-      valorPago: feeConfig.valorBase,
+      valorBase: base,
+      valorSolidario: p?.valorSolidario ?? 0,
+      valorJuros: p?.valorJuros ?? 0,
+      valorPago: base,
       dataPagamento: toIsoDate(payDate),
     });
     syncService.triggerSync();
     setLastUpdatedAtletaId(item.atleta.id);
     loadAthletes(selectedTeamIds);
-  };
+  }, [feeConfigs, payDate, mesReferencia, selectedTeamIds, loadAthletes, router]);
 
   // ── Modal ────────────────────────────────────────────────────────────────
 
-  const openModal = async (item: AthleteItem) => {
-    setModalItem(item);
+  const openModal = useCallback((item: AthleteItem) => {
     const feeConfig = feeConfigs.get(item.atleta.teamId);
     const p = item.currentPayment;
     const baseAmount = p?.valorBase ?? feeConfig?.valorBase ?? 0;
 
+    // Open immediately with the synchronous fields; load event parcelas in the background.
+    setModalItem(item);
     setModalDate(p?.dataPagamento ? new Date(p.dataPagamento) : new Date(payDate));
     setModalValorPago(String(p?.valorPago ?? baseAmount));
     setModalSolidario(String(p?.valorSolidario ?? 0));
     setModalJuros(String(p?.valorJuros ?? 0));
-
-    const pendingParcelas = await treasuryService.getPendingEventParcelas(item.atleta.id);
-    setModalEventParcelas(pendingParcelas.map(ep => {
-      const restante = ep.valorPago != null
-        ? parseFloat((ep.valorParcela - ep.valorPago).toFixed(2))
-        : ep.valorParcela;
-      return {
-        id: ep.id,
-        eventoId: ep.eventoId,
-        numeroParcela: ep.numeroParcela,
-        totalParcelas: ep.totalParcelas,
-        valorParcela: ep.valorParcela,
-        valorPago: ep.valorPago,
-        eventNome: ep.eventNome,
-        eventTipo: ep.eventTipo,
-        inputValorPago: String(restante),
-        markedPaid: false,
-      };
-    }));
-
+    setModalEventParcelas([]);
     setModalVisible(true);
-  };
+
+    treasuryService.getPendingEventParcelas(item.atleta.id).then(pendingParcelas => {
+      setModalEventParcelas(pendingParcelas.map(ep => {
+        const restante = ep.valorPago != null
+          ? parseFloat((ep.valorParcela - ep.valorPago).toFixed(2))
+          : ep.valorParcela;
+        return {
+          id: ep.id, eventoId: ep.eventoId, numeroParcela: ep.numeroParcela,
+          totalParcelas: ep.totalParcelas, valorParcela: ep.valorParcela, valorPago: ep.valorPago,
+          eventNome: ep.eventNome, eventTipo: ep.eventTipo,
+          inputValorPago: String(restante), markedPaid: false,
+        };
+      }));
+    });
+  }, [feeConfigs, payDate]);
 
   const handleModalSave = async () => {
     if (!modalItem) return;
@@ -303,7 +383,6 @@ export default function TreasuryIndex() {
       setModalEventParcelas(prev =>
         prev
           .map(e => e.id === parcelaId ? { ...e, markedPaid: false } : e)
-          // Remove auto-added next parcelas of same event (higher num, not paid)
           .filter(e => e.eventoId !== ep.eventoId || e.numeroParcela <= ep.numeroParcela || e.markedPaid)
       );
       return;
@@ -313,6 +392,7 @@ export default function TreasuryIndex() {
     await treasuryService.saveEventPayment(
       parcelaId, true,
       Math.abs(valorPago - ep.valorParcela) < 0.01 ? null : valorPago,
+      toIsoDate(modalDate),
     );
     syncService.triggerSync();
     setModalEventParcelas(prev => prev.map(e => e.id === parcelaId ? { ...e, markedPaid: true } : e));
@@ -326,17 +406,11 @@ export default function TreasuryIndex() {
           const restante = next.valorPago != null
             ? parseFloat((next.valorParcela - next.valorPago).toFixed(2))
             : next.valorParcela;
-          const newItem = {
-            id: next.id,
-            eventoId: next.eventoId,
-            numeroParcela: next.numeroParcela,
-            totalParcelas: next.totalParcelas,
-            valorParcela: next.valorParcela,
-            valorPago: next.valorPago,
-            eventNome: next.eventNome,
-            eventTipo: next.eventTipo,
-            inputValorPago: String(restante),
-            markedPaid: false,
+          const newItem: EventParcelaItem = {
+            id: next.id, eventoId: next.eventoId, numeroParcela: next.numeroParcela,
+            totalParcelas: next.totalParcelas, valorParcela: next.valorParcela, valorPago: next.valorPago,
+            eventNome: next.eventNome, eventTipo: next.eventTipo,
+            inputValorPago: String(restante), markedPaid: false,
           };
           const idx = prev.findIndex(e => e.id === parcelaId);
           const result = [...prev];
@@ -347,271 +421,224 @@ export default function TreasuryIndex() {
     }
   };
 
-  // ── Render helpers ────────────────────────────────────────────────────────
+  // ── Summary (hero) ──────────────────────────────────────────────────────────
 
-  const statusConfig: Record<string, { label: string; bg: string; text: string; border: boolean }> = {
-    pago:     { label: 'Pago',     bg: '#4CAF50',      text: '#fff',                  border: false },
-    parcial:  { label: 'Parcial',  bg: '#F57C00',      text: '#fff',                  border: false },
-    nao_pago: { label: 'Não pago', bg: 'transparent',  text: theme.colors.outline,    border: true  },
-  };
+  const summary = useMemo(() => {
+    let previsto = 0, arrecadado = 0, pagaram = 0;
+    for (const a of athletes) {
+      const base = a.currentPayment?.valorBase ?? feeConfigs.get(a.atleta.teamId)?.valorBase ?? 0;
+      previsto += base;
+      const st = getPaymentStatus(a);
+      if (st !== 'nao_pago') {
+        arrecadado += a.currentPayment?.valorPago ?? 0;
+        pagaram += 1;
+      }
+    }
+    return {
+      previsto, arrecadado, pagaram,
+      total: athletes.length,
+      pct: previsto > 0 ? Math.round((arrecadado / previsto) * 100) : 0,
+      aReceber: Math.max(0, previsto - arrecadado),
+    };
+  }, [athletes, feeConfigs]);
 
-  const renderAthlete = ({ item }: { item: AthleteItem }) => {
-    const status = getPaymentStatus(item);
-    const sc = statusConfig[status];
-    const isPaid = status === 'pago' || status === 'parcial';
-    const payDateStr = item.currentPayment?.dataPagamento ? formatDisplayDate(item.currentPayment.dataPagamento) : null;
-    const pendingEvents = item.pendingEventCount > 0;
+  // ── Athlete card ─────────────────────────────────────────────────────────
 
-    return (
-      <Card
-        mode="elevated"
-        style={{ marginBottom: 8, backgroundColor: theme.colors.elevation.level1 }}
-        onPress={isTesoureiro ? () => openModal(item) : undefined}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12 }}>
-          <View style={{
-            width: 6, height: 44, borderRadius: 3,
-            backgroundColor: item.team?.color ?? theme.colors.primary,
-            marginRight: 12,
-          }} />
-          <View style={{ flex: 1 }}>
-            <Text variant="titleSmall" style={{ fontWeight: 'bold' }}>
-              {item.atleta.surname?.trim() || item.atleta.name}
-            </Text>
-            <Text variant="bodySmall" style={{ opacity: 0.6 }}>
-              {item.team?.name ?? ''}
-              {item.overdueCount > 0 ? ` · +${item.overdueCount} em atraso` : ''}
-            </Text>
-          </View>
+  const renderAthlete = useCallback(({ item }: { item: AthleteItem }) => (
+    <AthleteRow
+      item={item}
+      fin={fin}
+      feeConfigs={feeConfigs}
+      isTesoureiro={isTesoureiro}
+      onOpen={openModal}
+      onQuickPay={handleQuickPay}
+    />
+  ), [fin, feeConfigs, isTesoureiro, openModal, handleQuickPay]);
 
-          {isPaid ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <View style={{ alignItems: 'center', gap: 2 }}>
-                {pendingEvents && (
-                  <View style={{
-                    backgroundColor: '#FF6F00', borderRadius: 10,
-                    width: 42, height: 18,
-                    justifyContent: 'center', alignItems: 'center',
-                  }}>
-                    <Text style={{ color: '#fff', fontSize: 11 }}>⚡ {item.pendingEventCount}</Text>
-                  </View>
-                )}
-                <View style={{
-                  backgroundColor: sc.bg, borderRadius: 10,
-                  width: 42, height: 18,
-                  justifyContent: 'center', alignItems: 'center',
-                }}>
-                  <Text style={{ color: sc.text, fontSize: 11 }}>{sc.label}</Text>
-                </View>
-              </View>
-            </View>
-          ) : isTesoureiro ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              {pendingEvents && (
-                <View style={{
-                  backgroundColor: '#FF6F00', borderRadius: 8,
-                  paddingHorizontal: 6, paddingVertical: 2,
-                }}>
-                  <Text style={{ color: '#fff', fontSize: 10 }}>⚡ {item.pendingEventCount}</Text>
-                </View>
-              )}
-              <Chip
-                compact
-                mode="flat"
-                style={{ backgroundColor: theme.colors.primary, height: 32, width: 42 }}
-                textStyle={{ color: '#fff', fontSize: 16 }}
-                onPress={() => handleQuickPay(item)}
-              >
-                ✓
-              </Chip>
-            </View>
-          ) : pendingEvents ? (
-            <View style={{
-              backgroundColor: '#FF6F00', borderRadius: 8,
-              paddingHorizontal: 6, paddingVertical: 2,
-            }}>
-              <Text style={{ color: '#fff', fontSize: 10 }}>⚡ {item.pendingEventCount}</Text>
-            </View>
-          ) : null}
-        </View>
-      </Card>
-    );
-  };
+  // ── Event card ───────────────────────────────────────────────────────────
 
   const renderEvent = ({ item }: { item: any }) => {
     const teamIds = JSON.parse(item.teamIds) as string[];
     const eventTeams = allTeams.filter(t => teamIds.includes(t.id));
+    const isCamp = item.tipo === 'campeonato';
+    const accent = isCamp ? fin.campeonato : fin.amistoso;
+    const accSoft = isCamp ? fin.campeonatoSoft : fin.amistosoSoft;
+    const dateRange = isoToShort(item.dataInicio) + (item.dataFim ? '–' + isoToShort(item.dataFim) : '');
+
     return (
-      <Card
-        mode="elevated"
-        style={{ marginBottom: 8, backgroundColor: theme.colors.elevation.level1 }}
+      <Pressable
         onPress={() => router.push(`/(app)/treasury/events/${item.id}`)}
+        style={{ backgroundColor: fin.surface, borderRadius: 16, padding: 14, marginBottom: 10, ...cardShadow(fin) }}
       >
-        <Card.Content>
-          <View style={{ flexDirection: 'row' }}>
-            <View style={{ flex: 1 }}>
-              <Text variant="titleSmall" style={{ fontWeight: 'bold', marginBottom: 4 }}>{item.nome}</Text>
-              <Text variant="bodySmall" style={{ opacity: 0.6 }}>
-                {eventTeams.map((t: any) => t.name).join(', ')}
-                {eventTeams.length > 0 ? ' · ' : ''}
-                R$ {item.valorPorAtleta.toFixed(2)}/atleta
-              </Text>
-              <Text variant="bodySmall" style={{ opacity: 0.5, marginTop: 2 }}>
-                {formatDisplayDate(item.dataInicio)}
-                {item.dataFim ? ` → ${formatDisplayDate(item.dataFim)}` : ''}
-              </Text>
-            </View>
-            <View style={{ alignItems: 'flex-end', justifyContent: 'space-evenly' }}>
-              <View style={{
-                backgroundColor: item.tipo === 'campeonato' ? '#7B1FA2' : '#1565C0',
-                paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10,
-              }}>
-                <Text style={{ color: '#fff', fontSize: 11 }}>{item.tipo}</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{ width: 46, height: 46, borderRadius: 13, backgroundColor: accSoft, alignItems: 'center', justifyContent: 'center' }}>
+            <MaterialIcons name={isCamp ? 'emoji-events' : 'sports-volleyball'} size={24} color={accent} />
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text numberOfLines={1} style={{ fontWeight: '800', fontSize: 17, color: fin.ink, letterSpacing: -0.2 }}>
+              {item.nome}
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 4 }}>
+              <View style={{ backgroundColor: accSoft, paddingVertical: 2, paddingHorizontal: 7, borderRadius: 6 }}>
+                <Text style={{ fontSize: 10, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase', color: accent }}>
+                  {item.tipo}
+                </Text>
               </View>
-              {item.allPaid && (
-                <View style={{
-                  backgroundColor: '#4CAF50',
-                  paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10,
-                }}>
-                  <Text style={{ color: '#fff', fontSize: 11 }}>Quitado</Text>
-                </View>
-              )}
+              <Text numberOfLines={1} style={{ flex: 1, fontSize: 12.5, color: fin.sub, fontWeight: '600' }}>
+                {eventTeams.map((t: any) => t.name).join(' · ')}
+                {eventTeams.length > 0 ? ' · ' : ''}{money(item.valorPorAtleta)}/atleta
+              </Text>
             </View>
           </View>
-        </Card.Content>
-      </Card>
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 12 }}>
+          <Text style={{ fontSize: 11.5, color: fin.sub, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{dateRange}</Text>
+          <View style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: fin.track, overflow: 'hidden' }}>
+            <View style={{ width: `${item.allPaid ? 100 : item.pct}%`, height: '100%', borderRadius: 3, backgroundColor: item.allPaid ? fin.good : accent }} />
+          </View>
+          {item.allPaid ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <MaterialIcons name="check" size={15} color={fin.good} />
+              <Text style={{ fontSize: 12, fontWeight: '800', color: fin.good }}>Quitado</Text>
+            </View>
+          ) : (
+            <Text style={{ fontSize: 12.5, color: fin.ink, fontWeight: '700', fontVariant: ['tabular-nums'] }}>
+              {item.pagosAtletas}/{item.nAtletas} <Text style={{ color: fin.sub, fontWeight: '600' }}>pagos</Text>
+            </Text>
+          )}
+        </View>
+      </Pressable>
     );
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Visible list (hidePaid filter keeps the just-updated athlete) ───────────
+
+  const visibleAthletes = useMemo(() => (
+    hidePaid
+      ? athletes.filter(a => getPaymentStatus(a) !== 'pago' || a.atleta.id === lastUpdatedAtletaId)
+      : athletes
+  ), [athletes, hidePaid, lastUpdatedAtletaId]);
+  const hiddenCount = athletes.length - visibleAthletes.length;
+
+  // Hero header — memoized so tapping a card / opening the modal never re-renders the ring.
+  const mensalidadesHeader = useMemo(() => (
+    <>
+      {/* Hero */}
+      <View style={{ backgroundColor: fin.heroBg, borderRadius: 18, padding: 16, marginBottom: 10, flexDirection: 'row', alignItems: 'center', gap: 16, ...(fin.shadow === 'transparent' ? { borderWidth: 1, borderColor: fin.line } : {}) }}>
+        <Ring pct={summary.pct} fin={fin} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontSize: 11.5, color: fin.sub, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase' }}>Arrecadado</Text>
+          <Text style={{ fontWeight: '800', fontSize: 27, color: fin.ink, fontVariant: ['tabular-nums'] }}>{money(summary.arrecadado)}</Text>
+          <View style={{ flexDirection: 'row', gap: 14, marginTop: 8 }}>
+            <View>
+              <Text style={{ fontWeight: '800', fontSize: 15, color: fin.good }}>
+                {summary.pagaram}<Text style={{ color: fin.sub, fontWeight: '600' }}>/{summary.total}</Text>
+              </Text>
+              <Text style={{ fontSize: 10.5, color: fin.sub, fontWeight: '600' }}>pagaram</Text>
+            </View>
+            <View style={{ width: 1, backgroundColor: fin.line }} />
+            <View>
+              <Text style={{ fontWeight: '800', fontSize: 15, color: fin.warn, fontVariant: ['tabular-nums'] }}>{money(summary.aReceber)}</Text>
+              <Text style={{ fontSize: 10.5, color: fin.sub, fontWeight: '600' }}>a receber</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Month nav + date stepper */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4, marginBottom: 10 }}>
+        <Pressable
+          onPress={() => { setPickerYear(monthDate.getFullYear()); setMonthPickerVisible(true); }}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+        >
+          <Pressable onPress={() => adjustMonth(-1)} hitSlop={8}><MaterialIcons name="chevron-left" size={20} color={fin.sub} /></Pressable>
+          <Text style={{ fontWeight: '800', fontSize: 14, color: fin.ink }}>{monthLabel}</Text>
+          <Pressable onPress={() => adjustMonth(1)} hitSlop={8}><MaterialIcons name="chevron-right" size={20} color={fin.sub} /></Pressable>
+        </Pressable>
+        {isTesoureiro && <DateStepper date={payDate} onStep={adjustPayDate} fin={fin} />}
+      </View>
+    </>
+  ), [fin, summary, monthLabel, monthDate, payDate, isTesoureiro, adjustMonth, adjustPayDate]);
+
+  // ── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <View style={{ flex: 1, backgroundColor: fin.bg }}>
       <SafeAreaView edges={['top']}>
-        {/* Title */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 }}>
-          <Text variant="displaySmall" style={{ fontWeight: 'bold', color: theme.colors.primary, flex: 1 }}>
-            Financeiro
-          </Text>
+        {/* Header */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 8 }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontWeight: '800', fontSize: 26, color: fin.ink, letterSpacing: -0.4 }}>
+              Financeiro
+            </Text>
+            <Text style={{ fontSize: 13, color: fin.sub, fontWeight: '600', marginTop: 2 }}>
+              Mensalidades e eventos do time
+            </Text>
+          </View>
+          {tab === 'mensalidades' && (
+            <IconBtn icon={hidePaid ? 'visibility-off' : 'visibility'} active={hidePaid} fin={fin} onPress={() => setHidePaid(v => !v)} />
+          )}
           <Menu
             visible={menuVisible}
             onDismiss={() => setMenuVisible(false)}
-            anchor={
-              <IconButton icon="dots-vertical" size={22} onPress={() => setMenuVisible(true)} />
-            }
+            anchor={<IconBtn icon="more-vert" fin={fin} onPress={() => setMenuVisible(true)} />}
           >
-            <Menu.Item
-              leadingIcon="account-multiple"
-              title="Escolher times"
-              onPress={() => { setMenuVisible(false); setTeamPickerVisible(true); }}
-            />
-            <Menu.Item
-              leadingIcon="chart-bar"
-              title="Calcular salário"
-              onPress={() => { setMenuVisible(false); router.push('/(app)/treasury/salary-report'); }}
-            />
+            <Menu.Item leadingIcon="account-multiple" title="Escolher times"
+              onPress={() => { setMenuVisible(false); setTeamPickerVisible(true); }} />
+            <Menu.Item leadingIcon="chart-bar" title="Calcular salário"
+              onPress={() => { setMenuVisible(false); router.push('/(app)/treasury/salary-report'); }} />
             {isTesoureiro && (
               <>
                 <Divider />
-                <Menu.Item
-                  leadingIcon="cash"
-                  title="Valor da mensalidade"
-                  onPress={() => { setMenuVisible(false); router.push('/(app)/treasury/fee-config'); }}
-                />
+                <Menu.Item leadingIcon="cash" title="Valor da mensalidade"
+                  onPress={() => { setMenuVisible(false); router.push('/(app)/treasury/fee-config'); }} />
               </>
             )}
           </Menu>
         </View>
 
-        {/* Static team indicators */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, gap: 12, paddingBottom: 8 }}>
-          {allTeams.filter(t => selectedTeamIds.has(t.id)).map(team => (
-            <View key={team.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: team.color }} />
-              <Text variant="bodySmall" style={{ opacity: 0.7 }}>{team.name}</Text>
-            </View>
-          ))}
-        </ScrollView>
+        {/* Tabs */}
+        <View style={{ paddingHorizontal: 18, paddingBottom: 10 }}>
+          <Tabs
+            value={tab}
+            onChange={setTab}
+            fin={fin}
+            options={[
+              { value: 'mensalidades', label: 'Mensalidades' },
+              { value: 'eventos', label: 'Eventos' },
+            ]}
+          />
+        </View>
 
-        {/* Tab selector */}
-        <SegmentedButtons
-          value={tab}
-          onValueChange={v => setTab(v as Tab)}
-          buttons={[
-            { value: 'mensalidades', label: 'Mensalidades' },
-            { value: 'eventos', label: 'Eventos' },
-          ]}
-          style={{ marginHorizontal: 16, marginBottom: 8 }}
-        />
-
-        {tab === 'mensalidades' && (
-          <>
-            {/* Month navigator */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: -2 }}>
-              <IconButton icon="chevron-left" size={20} onPress={() => adjustMonth(-1)} />
-              <TouchableOpacity
-                onPress={() => { setPickerYear(monthDate.getFullYear()); setMonthPickerVisible(true); }}
-                style={{ minWidth: 160, alignItems: 'center' }}
-              >
-                <Text variant="titleSmall" style={{ fontWeight: 'bold', textAlign: 'center' }}>
-                  {monthLabel}
-                </Text>
-              </TouchableOpacity>
-              <IconButton icon="chevron-right" size={20} onPress={() => adjustMonth(1)} />
-            </View>
-
-          </>
+        {/* Hidden-paid chip */}
+        {tab === 'mensalidades' && hidePaid && hiddenCount > 0 && (
+          <View style={{ paddingHorizontal: 18, paddingBottom: 8 }}>
+            <Pressable
+              onPress={() => setHidePaid(false)}
+              style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: fin.brandSoft, borderRadius: 20, paddingVertical: 5, paddingHorizontal: 12 }}
+            >
+              <MaterialIcons name="visibility-off" size={14} color={fin.brand} />
+              <Text style={{ fontSize: 12.5, fontWeight: '700', color: fin.brand }}>
+                {hiddenCount} pagos ocultos · <Text style={{ textDecorationLine: 'underline' }}>Mostrar</Text>
+              </Text>
+            </Pressable>
+          </View>
         )}
       </SafeAreaView>
-
-      {/* Date picker (shared) */}
-      {showPayDatePicker && (
-        <DateTimePicker
-          value={payDate}
-          mode="date"
-          display="default"
-          onChange={(_, date) => {
-            setShowPayDatePicker(Platform.OS === 'ios');
-            if (date) setPayDate(date);
-          }}
-        />
-      )}
 
       {/* Content */}
       {tab === 'mensalidades' ? (
         <FlatList
-          data={hidePaid
-            ? athletes.filter(a => getPaymentStatus(a) === 'nao_pago' || a.atleta.id === lastUpdatedAtletaId)
-            : athletes}
+          data={visibleAthletes}
           keyExtractor={item => item.atleta.id}
           renderItem={renderAthlete}
-          contentContainerStyle={{ padding: 16, paddingTop: 8 }}
+          contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 16 }}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={() => loadAthletes(selectedTeamIds)} />}
-          ListHeaderComponent={
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-              {isTesoureiro ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <IconButton icon="minus" size={16} style={{ margin: 0 }} onPress={() => adjustPayDate(-1)} />
-                  <Chip compact onPress={() => setShowPayDatePicker(true)} icon="calendar">
-                    {formatDate(payDate)}
-                  </Chip>
-                  <IconButton icon="plus" size={16} style={{ margin: 0 }} onPress={() => adjustPayDate(1)} />
-                </View>
-              ) : <View />}
-              <Chip
-                compact
-                selected={hidePaid}
-                onPress={() => setHidePaid(v => !v)}
-                icon={hidePaid ? 'eye-off' : 'eye'}
-              >
-                {hidePaid ? 'Mostrar pagos' : 'Ocultar pagos'}
-              </Chip>
-            </View>
-          }
+          ListHeaderComponent={mensalidadesHeader}
           ListEmptyComponent={!loading ? (
             <View style={{ alignItems: 'center', paddingTop: 40 }}>
-              <Text variant="bodyLarge" style={{ opacity: 0.5 }}>
+              <Text style={{ color: fin.sub, fontSize: 15, fontWeight: '600' }}>
                 {hidePaid ? 'Todos já pagaram!' : 'Nenhum atleta encontrado'}
               </Text>
             </View>
@@ -623,21 +650,27 @@ export default function TreasuryIndex() {
             data={events}
             keyExtractor={item => item.id}
             renderItem={renderEvent}
-            contentContainerStyle={{ padding: 16, paddingBottom: 80 }}
+            contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 90 }}
             refreshControl={<RefreshControl refreshing={loading} onRefresh={loadEvents} />}
             ListEmptyComponent={!loading ? (
               <View style={{ alignItems: 'center', paddingTop: 40 }}>
-                <Text variant="bodyLarge" style={{ opacity: 0.5 }}>Nenhum evento cadastrado</Text>
+                <Text style={{ color: fin.sub, fontSize: 15, fontWeight: '600' }}>Nenhum evento cadastrado</Text>
               </View>
             ) : null}
           />
           {isTesoureiro && (
-            <FAB
-              icon="plus"
-              style={{ position: 'absolute', bottom: 16, right: 16, backgroundColor: theme.colors.primary }}
-              color="#fff"
+            <Pressable
               onPress={() => router.push('/(app)/treasury/new-event')}
-            />
+              style={{
+                position: 'absolute', right: 18, bottom: 18,
+                flexDirection: 'row', alignItems: 'center', gap: 7,
+                backgroundColor: fin.brand, paddingVertical: 13, paddingHorizontal: 18, borderRadius: 16,
+                ...(fin.shadow === 'transparent' ? {} : { shadowColor: fin.brand, shadowOpacity: 0.4, shadowRadius: 18, shadowOffset: { width: 0, height: 6 }, elevation: 6 }),
+              }}
+            >
+              <MaterialIcons name="add" size={20} color="#fff" />
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14.5 }}>Novo evento</Text>
+            </Pressable>
           )}
         </>
       )}
@@ -649,22 +682,20 @@ export default function TreasuryIndex() {
           <Dialog.Content>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
               <IconButton icon="chevron-left" size={20} onPress={() => setPickerYear(y => y - 1)} />
-              <Text variant="titleMedium" style={{ minWidth: 60, textAlign: 'center' }}>{pickerYear}</Text>
+              <Text style={{ minWidth: 60, textAlign: 'center', fontSize: 18, fontWeight: '700', color: fin.ink }}>{pickerYear}</Text>
               <IconButton icon="chevron-right" size={20} onPress={() => setPickerYear(y => y + 1)} />
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'].map((m, i) => {
                 const isSelected = pickerYear === monthDate.getFullYear() && i === monthDate.getMonth();
                 return (
-                  <Chip
+                  <Pressable
                     key={i}
-                    selected={isSelected}
-                    selectedColor={theme.colors.primary}
-                    style={{ width: '30%' }}
                     onPress={() => { setMonthDate(new Date(pickerYear, i, 1)); setMonthPickerVisible(false); }}
+                    style={{ width: '30%', alignItems: 'center', paddingVertical: 10, borderRadius: 10, backgroundColor: isSelected ? fin.brand : fin.field }}
                   >
-                    {m}
-                  </Chip>
+                    <Text style={{ fontWeight: '700', color: isSelected ? '#fff' : fin.ink }}>{m}</Text>
+                  </Pressable>
                 );
               })}
             </View>
@@ -678,168 +709,132 @@ export default function TreasuryIndex() {
           <Dialog.Title>Escolher times</Dialog.Title>
           <Dialog.Content>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {allTeams.map(team => (
-                <Chip
-                  key={team.id}
-                  selected={selectedTeamIds.has(team.id)}
-                  onPress={() => toggleTeam(team.id)}
-                  style={{ backgroundColor: selectedTeamIds.has(team.id) ? team.color : undefined }}
-                  selectedColor="#fff"
-                >
-                  {team.name}
-                </Chip>
-              ))}
+              {allTeams.map(team => {
+                const sel = selectedTeamIds.has(team.id);
+                return (
+                  <Pressable
+                    key={team.id}
+                    onPress={() => toggleTeam(team.id)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1.5, borderColor: sel ? team.color : fin.line, backgroundColor: sel ? team.color : 'transparent', borderRadius: 20, paddingVertical: 7, paddingHorizontal: 13 }}
+                  >
+                    <View style={{ width: 9, height: 9, borderRadius: 4.5, backgroundColor: sel ? '#fff' : team.color }} />
+                    <Text style={{ fontWeight: '700', fontSize: 13, color: sel ? '#fff' : fin.sub }}>{team.name}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
           </Dialog.Content>
           <Dialog.Actions>
-            <Chip compact onPress={() => setTeamPickerVisible(false)}>Fechar</Chip>
+            <Pressable onPress={() => setTeamPickerVisible(false)} style={{ paddingVertical: 8, paddingHorizontal: 16 }}>
+              <Text style={{ color: fin.brand, fontWeight: '700' }}>Fechar</Text>
+            </Pressable>
           </Dialog.Actions>
         </Dialog>
       </Portal>
 
-      {/* Payment modal */}
+      {/* Payment modal (detailed editor) */}
       <Portal>
         <Modal
           visible={modalVisible}
           onDismiss={() => setModalVisible(false)}
-          contentContainerStyle={{
-            backgroundColor: theme.colors.surface,
-            margin: 16,
-            borderRadius: 16,
-            maxHeight: '88%',
-          }}
+          contentContainerStyle={{ backgroundColor: fin.surface, margin: 16, borderRadius: 18, maxHeight: '88%' }}
         >
-          <ScrollView keyboardShouldPersistTaps="handled" style={{ padding: 20 }}>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 20 }}>
             {modalItem && (
               <>
-                <Text variant="titleMedium" style={{ fontWeight: 'bold', marginBottom: 4 }}>
-                  {modalItem.atleta.surname?.trim() || modalItem.atleta.name}
-                </Text>
-                <Text variant="bodySmall" style={{ opacity: 0.6, marginBottom: 16 }}>
-                  {monthLabel} · {modalItem.team?.name}
-                </Text>
-
-                {/* Date - centered */}
-                <View style={{ alignItems: 'center', marginBottom: 16 }}>
-                  <Text variant="labelMedium" style={{ marginBottom: 6 }}>Data do pagamento</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <IconButton icon="minus" size={16} style={{ margin: 0 }}
-                      onPress={() => setModalDate(d => { const n = new Date(d); n.setDate(n.getDate() - 1); return n; })} />
-                    <Chip compact onPress={() => setShowModalDatePicker(true)} icon="calendar">
-                      {formatDate(modalDate)}
-                    </Chip>
-                    <IconButton icon="plus" size={16} style={{ margin: 0 }}
-                      onPress={() => setModalDate(d => { const n = new Date(d); n.setDate(n.getDate() + 1); return n; })} />
+                {/* Header */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                  <Avatar
+                    name={modalItem.atleta.surname?.trim() || modalItem.atleta.name}
+                    color={modalItem.team?.color ?? fin.brand}
+                    size={44} fin={fin}
+                  />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text numberOfLines={1} style={{ fontWeight: '800', fontSize: 20, color: fin.ink, letterSpacing: -0.2 }}>
+                      {modalItem.atleta.surname?.trim() || modalItem.atleta.name}
+                    </Text>
+                    <Text style={{ fontSize: 13, color: fin.sub, fontWeight: '600' }}>
+                      {monthLabelFull} · {modalItem.team?.name}
+                    </Text>
                   </View>
                 </View>
-                {showModalDatePicker && (
-                  <DateTimePicker
-                    value={modalDate}
-                    mode="date"
-                    display="default"
-                    onChange={(_, date) => {
-                      setShowModalDatePicker(Platform.OS === 'ios');
-                      if (date) setModalDate(date);
-                    }}
-                  />
-                )}
 
-                <PaperInput
-                  label="Valor pago (R$)"
-                  value={modalValorPago}
-                  onChangeText={setModalValorPago}
-                  mode="outlined"
-                  keyboardType="decimal-pad"
-                  style={{ marginBottom: 12 }}
-                />
-                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 16 }}>
-                  <PaperInput
-                    label="Solidário (R$)"
-                    value={modalSolidario}
-                    onChangeText={setModalSolidario}
-                    mode="outlined"
-                    keyboardType="decimal-pad"
-                    style={{ flex: 1 }}
+                {/* Date */}
+                <View style={{ alignItems: 'center', marginBottom: 18 }}>
+                  <DateStepper
+                    date={modalDate}
+                    fin={fin}
+                    onStep={(d) => setModalDate(prev => { const n = new Date(prev); n.setDate(n.getDate() + d); return n; })}
                   />
-                  <PaperInput
-                    label="Juros (R$)"
-                    value={modalJuros}
-                    onChangeText={setModalJuros}
-                    mode="outlined"
-                    keyboardType="decimal-pad"
-                    style={{ flex: 1 }}
-                  />
+                </View>
+
+                {/* Valor pago */}
+                <View style={{ marginBottom: 14 }}>
+                  <FieldLabel fin={fin}>Valor pago</FieldLabel>
+                  <FieldPill fin={fin} value={modalValorPago} onChangeText={setModalValorPago} prefix="R$" placeholder="0" keyboardType="decimal-pad" />
+                </View>
+
+                {/* Solidário + Juros */}
+                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 18 }}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <FieldLabel fin={fin}>Solidário</FieldLabel>
+                    <FieldPill fin={fin} value={modalSolidario} onChangeText={setModalSolidario} prefix="R$" placeholder="0" keyboardType="decimal-pad" />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <FieldLabel fin={fin}>Juros</FieldLabel>
+                    <FieldPill fin={fin} value={modalJuros} onChangeText={setModalJuros} prefix="R$" placeholder="0" keyboardType="decimal-pad" />
+                  </View>
                 </View>
 
                 {/* Pending event parcelas */}
                 {modalEventParcelas.length > 0 && (
                   <>
-                    <Text variant="labelLarge" style={{ marginBottom: 10, opacity: 0.7 }}>
-                      Parcelas de eventos pendentes
-                    </Text>
+                    <FieldLabel fin={fin}>Parcelas de eventos pendentes</FieldLabel>
                     {modalEventParcelas.map(ep => (
-                      <View
-                        key={ep.id}
-                        style={{
-                          flexDirection: 'row', alignItems: 'center',
-                          paddingVertical: 8,
-                          borderTopWidth: 1, borderTopColor: theme.colors.surfaceVariant,
-                        }}
-                      >
-                        <View style={{ flex: 1 }}>
-                          <Text variant="bodySmall" style={{ fontWeight: 'bold' }}>{ep.eventNome}</Text>
-                          <Text variant="bodySmall" style={{ opacity: 0.6 }}>
-                            Parcela {ep.numeroParcela}/{ep.totalParcelas} · R$ {ep.valorParcela.toFixed(2)}
-                            {ep.valorPago != null ? ` · pago R$ ${ep.valorPago.toFixed(2)}` : ''}
+                      <View key={ep.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8, borderTopWidth: 1, borderTopColor: fin.line }}>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text numberOfLines={1} style={{ fontWeight: '700', fontSize: 13.5, color: fin.ink }}>{ep.eventNome}</Text>
+                          <Text style={{ fontSize: 12, color: fin.sub, fontWeight: '600' }}>
+                            Parcela {ep.numeroParcela}/{ep.totalParcelas} · {money(ep.valorParcela)}
+                            {ep.valorPago != null ? ` · pago ${money(ep.valorPago)}` : ''}
                           </Text>
                         </View>
-                        <PaperInput
+                        <FieldPill
+                          fin={fin}
                           value={ep.inputValorPago}
-                          onChangeText={val =>
-                            setModalEventParcelas(prev => prev.map(e => e.id === ep.id ? { ...e, inputValorPago: val } : e))
-                          }
-                          mode="outlined"
+                          onChangeText={val => setModalEventParcelas(prev => prev.map(e => e.id === ep.id ? { ...e, inputValorPago: val } : e))}
                           keyboardType="decimal-pad"
-                          style={{ width: 86, marginRight: 4 }}
-                          dense
                           disabled={ep.markedPaid}
+                          style={{ width: 92, height: 42, paddingHorizontal: 10 }}
                         />
-                        <IconButton
-                          icon={ep.markedPaid ? 'check-circle' : 'check-circle-outline'}
-                          iconColor={ep.markedPaid ? '#4CAF50' : theme.colors.primary}
-                          size={26}
-                          style={{ margin: 0 }}
+                        <Pressable
                           onPress={() => handleModalEventPay(ep.id)}
-                        />
+                          hitSlop={6}
+                          style={{
+                            width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+                            backgroundColor: ep.markedPaid ? fin.good : fin.brandSoft,
+                          }}
+                        >
+                          <MaterialIcons name="check" size={20} color={ep.markedPaid ? '#fff' : fin.brand} />
+                        </Pressable>
                       </View>
                     ))}
-                    <View style={{ height: 8 }} />
+                    <View style={{ height: 10 }} />
                   </>
                 )}
 
                 {/* Actions */}
-                <View style={{ flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 8 }}>
-                  <Chip compact onPress={() => setModalVisible(false)} style={{ flex: 1 }}>
-                    Cancelar
-                  </Chip>
-                  <Chip
-                    compact
-                    mode="flat"
-                    style={{ flex: 1, backgroundColor: theme.colors.primary }}
-                    textStyle={{ color: '#fff' }}
-                    onPress={handleModalSave}
-                    disabled={modalSaving}
-                  >
-                    {modalSaving ? '...' : 'Confirmar'}
-                  </Chip>
+                <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+                  <Pressable onPress={() => setModalVisible(false)} style={{ flex: 1, alignItems: 'center', paddingVertical: 13, borderRadius: 14, borderWidth: 1.5, borderColor: fin.line }}>
+                    <Text style={{ color: fin.sub, fontWeight: '700', fontSize: 15 }}>Cancelar</Text>
+                  </Pressable>
+                  <Pressable onPress={handleModalSave} disabled={modalSaving} style={{ flex: 1, alignItems: 'center', paddingVertical: 13, borderRadius: 14, backgroundColor: fin.brand, opacity: modalSaving ? 0.6 : 1 }}>
+                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 15 }}>{modalSaving ? '...' : 'Confirmar'}</Text>
+                  </Pressable>
                 </View>
 
                 {modalItem.currentPayment && (
-                  <Chip
-                    compact
-                    mode="outlined"
-                    textStyle={{ color: theme.colors.error }}
-                    style={{ borderColor: theme.colors.error, marginBottom: 8 }}
+                  <Pressable
                     onPress={() => {
                       Alert.alert('Remover registro', 'Remover este pagamento?', [
                         { text: 'Cancelar', style: 'cancel' },
@@ -853,9 +848,10 @@ export default function TreasuryIndex() {
                         },
                       ]);
                     }}
+                    style={{ alignItems: 'center', paddingVertical: 12, marginTop: 4 }}
                   >
-                    Remover registro
-                  </Chip>
+                    <Text style={{ color: theme.colors.error, fontWeight: '700' }}>Remover registro</Text>
+                  </Pressable>
                 )}
               </>
             )}

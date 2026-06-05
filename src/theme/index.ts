@@ -2,6 +2,7 @@ import {
   MD3LightTheme,
   MD3DarkTheme,
   adaptNavigationTheme,
+  useTheme,
 } from 'react-native-paper';
 import {
   DarkTheme as NavigationDarkTheme,
@@ -89,6 +90,90 @@ const CustomMD3DarkThemeColors = {
 };
 
 
+// ── Financeiro design tokens (Blues redesign) ────────────────────────────────
+// Own palette derived from the team blue. Light/dark pair for every token.
+// Consumed via the `useFin()` hook below so screens never hard-code hex.
+export type FinTokens = {
+  bg: string;
+  surface: string;
+  field: string;
+  ink: string;
+  sub: string;
+  line: string;
+  brand: string;
+  brandSoft: string;
+  heroBg: string;
+  chipBg: string;
+  good: string;
+  goodSoft: string;
+  warn: string;
+  warnSoft: string;
+  track: string;
+  ringTrack: string;
+  amistoso: string;
+  amistosoSoft: string;
+  campeonato: string;
+  campeonatoSoft: string;
+  eyeBg: string;      // inactive eye/icon-button background
+  stepBtn: string;    // −/+ stepper button background
+  disabled: string;   // disabled primary button background
+  shadow: string;     // card shadow color (light only)
+};
+
+export const FIN_LIGHT: FinTokens = {
+  bg: '#EAEEF7',
+  surface: '#FFFFFF',
+  field: '#F4F7FC',
+  ink: '#16213B',
+  sub: '#6A7794',
+  line: '#E7EBF4',
+  brand: '#0054DA',
+  brandSoft: '#E6EDFF',
+  heroBg: '#EEF3FF',
+  chipBg: '#E0E6F2',
+  good: '#16A05A',
+  goodSoft: '#E2F6EC',
+  warn: '#E08A12',
+  warnSoft: '#FCEFD8',
+  track: '#E4EAF5',
+  ringTrack: '#D6E0F5',
+  amistoso: '#0054DA',
+  amistosoSoft: '#E6EDFF',
+  campeonato: '#7C3AED',
+  campeonatoSoft: '#EFE9FE',
+  eyeBg: '#EEF2FA',
+  stepBtn: '#F3F6FC',
+  disabled: '#C9D4E8',
+  shadow: 'rgba(20,33,59,0.18)',
+};
+
+export const FIN_DARK: FinTokens = {
+  bg: '#0E1119',
+  surface: '#181D2A',
+  field: '#11151F',
+  ink: '#E9EDF7',
+  sub: '#909BB4',
+  line: '#262C3C',
+  brand: '#5C9CFF',
+  brandSoft: '#15254C',
+  heroBg: '#10203F',
+  chipBg: '#10141D',
+  good: '#34C97E',
+  goodSoft: '#10301F',
+  warn: '#F0A93A',
+  warnSoft: '#33240F',
+  track: '#222A3B',
+  ringTrack: '#26304A',
+  amistoso: '#5C9CFF',
+  amistosoSoft: '#15254C',
+  campeonato: '#A78BFA',
+  campeonatoSoft: '#241A40',
+  eyeBg: '#1E2433',
+  stepBtn: '#1E2433',
+  disabled: '#222A3B',
+  shadow: 'transparent',
+};
+
 export const CombinedDefaultTheme = {
   ...MD3LightTheme,
   ...LightTheme,
@@ -110,3 +195,6 @@ export const CombinedDarkTheme = {
   },
   fonts: MD3DarkTheme.fonts,
 };
+
+/** Returns the Financeiro design tokens for the active (light/dark) theme. */
+export const useFin = (): FinTokens => (useTheme().dark ? FIN_DARK : FIN_LIGHT);

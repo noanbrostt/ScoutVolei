@@ -1,23 +1,23 @@
-import { View, ScrollView, TouchableOpacity } from 'react-native';
-import { Text, useTheme, Appbar, Chip, IconButton, Card, Divider, Portal, Dialog, ActivityIndicator } from 'react-native-paper';
+import { View, ScrollView, Pressable, ActivityIndicator } from 'react-native';
+import { Text, Portal, Dialog } from 'react-native-paper';
+import { MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { teamService } from '../../../src/services/teamService';
 import { treasuryService } from '../../../src/services/treasuryService';
+import { useFin } from '../../../src/theme';
+import { money, cardShadow, Avatar } from '../../../src/components/treasury/finance-ui';
 
 const TEAMS_STORAGE_KEY = 'treasury_selected_teams';
 
 type AthleteRow = Awaited<ReturnType<typeof treasuryService.getMonthlyAthletes>>[number];
 
-const fmt = (val: number) =>
-  val.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
 const MONTHS = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 export default function SalaryReport() {
-  const theme = useTheme();
+  const fin = useFin();
   const router = useRouter();
 
   const [allTeams, setAllTeams] = useState<any[]>([]);
@@ -92,24 +92,21 @@ export default function SalaryReport() {
   const paid   = athletes.filter(a => a.currentPayment?.dataPagamento);
   const unpaid = athletes.filter(a => !a.currentPayment?.dataPagamento);
 
-  // Real: sum of what was actually collected
   const realMensalidades = paid.reduce((s, a) => {
     const p = a.currentPayment!;
-    return s + (p.valorPago ?? p.valorBase); // null = paid in full → use valorBase
+    return s + (p.valorPago ?? p.valorBase);
   }, 0);
   const realSolidario = paid.reduce((s, a) => s + (a.currentPayment?.valorSolidario ?? 0), 0);
   const realJuros     = paid.reduce((s, a) => s + (a.currentPayment?.valorJuros     ?? 0), 0);
   const realSalary    = realMensalidades + realSolidario;
 
-  // Projection: as if every athlete paid their full base amount
   const projMensalidades = athletes.reduce((s, a) => {
     const base = a.currentPayment?.valorBase ?? feeConfigs.get(a.atleta.teamId)?.valorBase ?? 0;
     return s + base;
   }, 0);
-  const projSalary = projMensalidades + realSolidario; // solidário stays the same (unknown for unpaid)
+  const projSalary = projMensalidades + realSolidario;
 
   const displayMensalidades = showProjection ? projMensalidades : realMensalidades;
-  const displaySolidario    = realSolidario; // always real
   const displaySalary       = showProjection ? projSalary : realSalary;
 
   const isPartial = (a: AthleteRow) => {
@@ -119,141 +116,140 @@ export default function SalaryReport() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
 
-  const renderRow = (a: AthleteRow, showAmount: boolean) => {
+  const SummaryLine = ({ label, value, sub }: { label: string; value: string; sub?: boolean }) => (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      <Text style={{ fontSize: sub ? 12 : 13.5, color: fin.sub, fontWeight: '600' }}>{label}</Text>
+      <Text style={{ fontSize: sub ? 12 : 14, color: sub ? fin.sub : fin.ink, fontWeight: sub ? '600' : '700', fontVariant: ['tabular-nums'] }}>{value}</Text>
+    </View>
+  );
+
+  const renderRow = (a: AthleteRow, showAmount: boolean, last: boolean) => {
     const nome = a.atleta.surname?.trim() || a.atleta.name;
+    const color = a.team?.color ?? fin.brand;
     const partial = isPartial(a);
     const valorBase = a.currentPayment?.valorBase ?? feeConfigs.get(a.atleta.teamId)?.valorBase;
 
     return (
-      <View key={a.atleta.id} style={{
-        flexDirection: 'row', alignItems: 'center',
-        paddingVertical: 9,
-        borderBottomWidth: 1, borderBottomColor: theme.colors.surfaceVariant,
-      }}>
-        <View style={{
-          width: 5, height: 28, borderRadius: 3,
-          backgroundColor: a.team?.color ?? theme.colors.primary,
-          marginRight: 10,
-        }} />
-        <View style={{ flex: 1 }}>
-          <Text variant="bodyMedium">{nome}</Text>
-          <Text variant="bodySmall" style={{ opacity: 0.55 }}>{a.team?.name ?? ''}</Text>
+      <View
+        key={a.atleta.id}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 10, paddingHorizontal: 13, borderTopWidth: last ? 0 : 0, borderBottomWidth: 1, borderBottomColor: fin.line }}
+      >
+        <Avatar name={nome} color={color} size={36} fontSize={13} fin={fin} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text numberOfLines={1} style={{ fontWeight: '700', fontSize: 15, color: fin.ink }}>{nome}</Text>
+          <Text style={{ fontSize: 12, color: fin.sub, fontWeight: '600', marginTop: 1 }}>{a.team?.name ?? ''}</Text>
         </View>
-        {showAmount && (
+        {showAmount ? (
           <View style={{ alignItems: 'flex-end' }}>
-            <Text variant="bodySmall">
-              R$ {fmt(a.currentPayment!.valorPago ?? a.currentPayment!.valorBase)}
+            <Text style={{ fontWeight: '800', fontSize: 14, color: fin.ink, fontVariant: ['tabular-nums'] }}>
+              {money(a.currentPayment!.valorPago ?? a.currentPayment!.valorBase)}
             </Text>
-            {partial && (
-              <Text style={{ fontSize: 10, color: '#F57C00' }}>parcial</Text>
-            )}
+            {partial && <Text style={{ fontSize: 10.5, color: fin.warn, fontWeight: '700' }}>parcial</Text>}
           </View>
-        )}
-        {!showAmount && valorBase != null && (
-          <Text variant="bodySmall" style={{ opacity: 0.35 }}>R$ {fmt(valorBase)}</Text>
-        )}
+        ) : valorBase != null ? (
+          <Text style={{ fontSize: 13.5, color: fin.sub, fontWeight: '600', fontVariant: ['tabular-nums'], opacity: 0.7 }}>{money(valorBase)}</Text>
+        ) : null}
       </View>
     );
   };
 
+  const listCard = (rows: AthleteRow[], showAmount: boolean) => (
+    <View style={{ backgroundColor: fin.surface, borderRadius: 14, overflow: 'hidden', ...cardShadow(fin) }}>
+      {rows.map((a, i) => renderRow(a, showAmount, i === rows.length - 1))}
+    </View>
+  );
+
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <View style={{ flex: 1, backgroundColor: fin.bg }}>
       <SafeAreaView edges={['top']}>
-        <Appbar.Header statusBarHeight={0} style={{ backgroundColor: 'transparent', elevation: 0 }}>
-          <Appbar.BackAction onPress={() => router.back()} />
-          <Appbar.Content title="Calcular Salário" />
-        </Appbar.Header>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 8 }}>
+          <Pressable onPress={() => router.back()} hitSlop={8}>
+            <MaterialIcons name="arrow-back" size={24} color={fin.ink} />
+          </Pressable>
+          <Text style={{ fontWeight: '800', fontSize: 19, color: fin.ink, letterSpacing: -0.3 }}>Calcular salário</Text>
+        </View>
       </SafeAreaView>
 
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: 40 }}>
         {/* Month navigator */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-          <IconButton icon="chevron-left" size={20} onPress={() => adjustMonth(-1)} />
-          <TouchableOpacity
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginBottom: 14 }}>
+          <Pressable onPress={() => adjustMonth(-1)} hitSlop={8}><MaterialIcons name="chevron-left" size={22} color={fin.sub} /></Pressable>
+          <Pressable
             onPress={() => { setPickerYear(monthDate.getFullYear()); setMonthPickerVisible(true); }}
-            style={{ minWidth: 160, alignItems: 'center' }}
+            style={{ minWidth: 150, alignItems: 'center' }}
           >
-            <Text variant="titleSmall" style={{ fontWeight: 'bold' }}>{monthLabel}</Text>
-          </TouchableOpacity>
-          <IconButton icon="chevron-right" size={20} onPress={() => adjustMonth(1)} />
+            <Text style={{ fontWeight: '800', fontSize: 16, color: fin.ink }}>{monthLabel}</Text>
+          </Pressable>
+          <Pressable onPress={() => adjustMonth(1)} hitSlop={8}><MaterialIcons name="chevron-right" size={22} color={fin.sub} /></Pressable>
         </View>
 
         {/* Team chips */}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
-          {allTeams.map(team => (
-            <Chip
-              key={team.id}
-              selected={selectedTeamIds.has(team.id)}
-              onPress={() => toggleTeam(team.id)}
-              style={{ backgroundColor: selectedTeamIds.has(team.id) ? team.color : undefined }}
-              selectedColor="#fff"
-            >
-              {team.name}
-            </Chip>
-          ))}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 }}>
+          {allTeams.map(team => {
+            const sel = selectedTeamIds.has(team.id);
+            return (
+              <Pressable
+                key={team.id}
+                onPress={() => toggleTeam(team.id)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 7, borderWidth: 1.5, borderColor: sel ? team.color : fin.line, backgroundColor: sel ? team.color : 'transparent', borderRadius: 20, paddingVertical: 7, paddingHorizontal: 13 }}
+              >
+                <View style={{ width: 9, height: 9, borderRadius: 4.5, backgroundColor: sel ? '#fff' : team.color }} />
+                <Text style={{ fontWeight: '700', fontSize: 13, color: sel ? '#fff' : fin.sub }}>{team.name}</Text>
+              </Pressable>
+            );
+          })}
         </View>
 
         {loading ? (
-          <ActivityIndicator style={{ marginTop: 40 }} />
+          <ActivityIndicator style={{ marginTop: 40 }} color={fin.brand} />
         ) : (
           <>
             {/* Summary card */}
-            <Card mode="elevated" style={{ marginBottom: 20, backgroundColor: theme.colors.elevation.level2 }}>
-              <Card.Content style={{ paddingVertical: 16 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <Text variant="bodyMedium" style={{ opacity: 0.7 }}>Mensalidades</Text>
-                  <Text variant="bodyMedium">R$ {fmt(displayMensalidades)}</Text>
-                </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <Text variant="bodyMedium" style={{ opacity: 0.7 }}>Solidário</Text>
-                  <Text variant="bodyMedium">R$ {fmt(displaySolidario)}</Text>
-                </View>
-                <Divider style={{ marginBottom: 14 }} />
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>Salário</Text>
-                  <Text variant="titleMedium" style={{ fontWeight: 'bold', color: theme.colors.primary }}>
-                    R$ {fmt(displaySalary)}
-                  </Text>
-                </View>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 18 }}>
-                  <Text variant="bodySmall" style={{ opacity: 0.55 }}>Juros (caixinha)</Text>
-                  <Text variant="bodySmall" style={{ opacity: 0.55 }}>R$ {fmt(realJuros)}</Text>
-                </View>
+            <View style={{ backgroundColor: fin.surface, borderRadius: 18, padding: 18, marginBottom: 20, ...cardShadow(fin) }}>
+              <View style={{ gap: 8 }}>
+                <SummaryLine label="Mensalidades" value={money(displayMensalidades)} />
+                <SummaryLine label="Solidário" value={money(realSolidario)} />
+              </View>
+              <View style={{ height: 1, backgroundColor: fin.line, marginVertical: 14 }} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: fin.ink }}>Salário</Text>
+                <Text style={{ fontSize: 24, fontWeight: '800', color: fin.brand, fontVariant: ['tabular-nums'] }}>{money(displaySalary)}</Text>
+              </View>
+              <View style={{ marginTop: 10 }}>
+                <SummaryLine label="Juros (caixinha)" value={money(realJuros)} sub />
+              </View>
 
-                {/* Projection toggle */}
-                <Chip
-                  compact
-                  mode={showProjection ? 'flat' : 'outlined'}
-                  selected={showProjection}
-                  selectedColor={theme.colors.onPrimaryContainer}
-                  style={showProjection ? { backgroundColor: theme.colors.primaryContainer } : {}}
-                  icon="calculator"
-                  onPress={() => setShowProjection(v => !v)}
-                >
-                  E se todos tivessem pago?
-                </Chip>
-                {showProjection && (
-                  <Text variant="bodySmall" style={{ opacity: 0.5, marginTop: 6 }}>
-                    Projeção com {athletes.length} atleta{athletes.length !== 1 ? 's' : ''} pagando o valor base completo.
-                    {unpaid.length > 0
-                      ? ` Inclui ${unpaid.length} ainda não pago${unpaid.length !== 1 ? 's' : ''}.`
-                      : ''}
-                    {paid.filter(isPartial).length > 0
-                      ? ` Inclui ${paid.filter(isPartial).length} pagamento${paid.filter(isPartial).length !== 1 ? 's' : ''} parcial${paid.filter(isPartial).length !== 1 ? 'is' : ''}.`
-                      : ''}
-                  </Text>
-                )}
-              </Card.Content>
-            </Card>
+              {/* Projection toggle */}
+              <Pressable
+                onPress={() => setShowProjection(v => !v)}
+                style={{
+                  flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 16,
+                  borderWidth: 1.5, borderColor: showProjection ? fin.brand : fin.line,
+                  backgroundColor: showProjection ? fin.brand : 'transparent',
+                  borderRadius: 20, paddingVertical: 7, paddingHorizontal: 13,
+                }}
+              >
+                <MaterialIcons name="calculate" size={16} color={showProjection ? '#fff' : fin.sub} />
+                <Text style={{ fontWeight: '700', fontSize: 12.5, color: showProjection ? '#fff' : fin.sub }}>E se todos tivessem pago?</Text>
+              </Pressable>
+              {showProjection && (
+                <Text style={{ fontSize: 12, color: fin.sub, fontWeight: '600', marginTop: 8 }}>
+                  Projeção com {athletes.length} atleta{athletes.length !== 1 ? 's' : ''} pagando o valor base completo.
+                  {unpaid.length > 0 ? ` Inclui ${unpaid.length} ainda não pago${unpaid.length !== 1 ? 's' : ''}.` : ''}
+                  {paid.filter(isPartial).length > 0
+                    ? ` Inclui ${paid.filter(isPartial).length} pagamento${paid.filter(isPartial).length !== 1 ? 's' : ''} parcial${paid.filter(isPartial).length !== 1 ? 'is' : ''}.`
+                    : ''}
+                </Text>
+              )}
+            </View>
 
             {/* Paid list */}
             {paid.length > 0 && (
               <>
-                <Text variant="labelLarge" style={{ marginBottom: 8, color: '#4CAF50' }}>
+                <Text style={{ fontSize: 12.5, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase', color: fin.good, marginBottom: 8 }}>
                   Pagaram ({paid.length})
                 </Text>
-                {paid.map(a => renderRow(a, true))}
+                {listCard(paid, true)}
                 <View style={{ height: 20 }} />
               </>
             )}
@@ -261,15 +257,15 @@ export default function SalaryReport() {
             {/* Unpaid list */}
             {unpaid.length > 0 && (
               <>
-                <Text variant="labelLarge" style={{ marginBottom: 8, color: theme.colors.error }}>
+                <Text style={{ fontSize: 12.5, fontWeight: '800', letterSpacing: 0.3, textTransform: 'uppercase', color: fin.warn, marginBottom: 8 }}>
                   Não pagaram ({unpaid.length})
                 </Text>
-                {unpaid.map(a => renderRow(a, false))}
+                {listCard(unpaid, false)}
               </>
             )}
 
             {athletes.length === 0 && selectedTeamIds.size > 0 && (
-              <Text variant="bodyLarge" style={{ opacity: 0.5, textAlign: 'center', marginTop: 40 }}>
+              <Text style={{ color: fin.sub, fontSize: 15, fontWeight: '600', textAlign: 'center', marginTop: 40 }}>
                 Nenhum atleta encontrado
               </Text>
             )}
@@ -283,23 +279,21 @@ export default function SalaryReport() {
           <Dialog.Title>Selecionar mês</Dialog.Title>
           <Dialog.Content>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 12 }}>
-              <IconButton icon="chevron-left" size={20} onPress={() => setPickerYear(y => y - 1)} />
-              <Text variant="titleMedium" style={{ minWidth: 60, textAlign: 'center' }}>{pickerYear}</Text>
-              <IconButton icon="chevron-right" size={20} onPress={() => setPickerYear(y => y + 1)} />
+              <Pressable onPress={() => setPickerYear(y => y - 1)} hitSlop={8}><MaterialIcons name="chevron-left" size={22} color={fin.sub} /></Pressable>
+              <Text style={{ minWidth: 60, textAlign: 'center', fontSize: 18, fontWeight: '700', color: fin.ink }}>{pickerYear}</Text>
+              <Pressable onPress={() => setPickerYear(y => y + 1)} hitSlop={8}><MaterialIcons name="chevron-right" size={22} color={fin.sub} /></Pressable>
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {MONTHS.map((m, i) => {
                 const isSelected = pickerYear === monthDate.getFullYear() && i === monthDate.getMonth();
                 return (
-                  <Chip
+                  <Pressable
                     key={i}
-                    selected={isSelected}
-                    selectedColor={theme.colors.primary}
-                    style={{ width: '30%' }}
                     onPress={() => { setMonthDate(new Date(pickerYear, i, 1)); setMonthPickerVisible(false); }}
+                    style={{ width: '30%', alignItems: 'center', paddingVertical: 10, borderRadius: 10, backgroundColor: isSelected ? fin.brand : fin.field }}
                   >
-                    {m}
-                  </Chip>
+                    <Text style={{ fontWeight: '700', color: isSelected ? '#fff' : fin.ink }}>{m}</Text>
+                  </Pressable>
                 );
               })}
             </View>

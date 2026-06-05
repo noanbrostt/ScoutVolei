@@ -1,10 +1,10 @@
 import { Tabs, Redirect } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useTheme } from 'react-native-paper';
 import { useAuthStore } from '../../src/store/authStore';
+import { useFin } from '../../src/theme';
 
 export default function AppLayout() {
-  const theme = useTheme();
+  const fin = useFin();
   const { user } = useAuthStore();
   const canSeeTreasury = user?.role === 'admin' || user?.role === 'financeiro';
 
@@ -16,11 +16,17 @@ export default function AppLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: theme.colors.primary,
+        tabBarActiveTintColor: fin.brand,
+        tabBarInactiveTintColor: fin.sub,
         tabBarStyle: {
-          backgroundColor: theme.colors.elevation.level2,
-          borderTopWidth: 0,
-          elevation: 5,
+          backgroundColor: fin.surface,
+          borderTopWidth: 1,
+          borderTopColor: fin.line,
+          elevation: 0,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '700',
         },
       }}
     >

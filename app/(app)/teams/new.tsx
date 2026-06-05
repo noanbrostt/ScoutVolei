@@ -1,28 +1,21 @@
-import { View, TouchableOpacity, ScrollView } from 'react-native';
-import { TextInput, Button, Appbar, useTheme, Text } from 'react-native-paper';
+import { View, ScrollView, Pressable } from 'react-native';
+import { Text } from 'react-native-paper';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { teamService } from '../../../src/services/teamService';
 import { syncService } from '../../../src/services/syncService';
+import { useFin } from '../../../src/theme';
+import { ScreenHeader, FieldLabel, FieldPill, PillButton } from '../../../src/components/ui';
 
 const TEAM_COLORS = [
-  '#2196F3', // Blue
-  '#F44336', // Red
-  '#4CAF50', // Green
-  '#FFC107', // Amber
-  '#9C27B0', // Purple
-  '#FF9800', // Orange
-  '#009688', // Teal
-  '#795548', // Brown
-  '#607D8B', // Blue Grey
-  '#000000', // Black
-  '#E91E63', // Pink
-  '#3F51B5', // Indigo
+  '#2196F3', '#F44336', '#4CAF50', '#FFC107', '#9C27B0', '#FF9800',
+  '#009688', '#795548', '#607D8B', '#000000', '#E91E63', '#3F51B5',
 ];
 
 export default function NewTeam() {
   const router = useRouter();
-  const theme = useTheme();
+  const fin = useFin();
   const [name, setName] = useState('');
   const [selectedColor, setSelectedColor] = useState(TEAM_COLORS[0]);
   const [saving, setSaving] = useState(false);
@@ -42,51 +35,37 @@ export default function NewTeam() {
   };
 
   return (
-    <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-      <Appbar.Header>
-        <Appbar.BackAction onPress={() => router.back()} />
-        <Appbar.Content title="Novo Time" />
-      </Appbar.Header>
+    <View style={{ flex: 1, backgroundColor: fin.bg }}>
+      <ScreenHeader title="Novo time" onBack={() => router.back()} fin={fin} />
 
-      <View className="p-4 gap-6">
-        <TextInput
-          label="Nome do Time"
-          value={name}
-          onChangeText={setName}
-          mode="outlined"
-        />
-        
-        <View>
-          <Text variant="titleMedium" style={{ marginBottom: 8, textAlign: 'center' }}>Cor do Time</Text>
-          <View className="flex-row flex-wrap gap-4 justify-center">
-            {TEAM_COLORS.map((color) => (
-              <TouchableOpacity
-                key={color}
-                onPress={() => setSelectedColor(color)}
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
-                  backgroundColor: color,
-                  borderWidth: selectedColor === color ? 3 : 0,
-                  borderColor: theme.colors.onBackground,
-                  elevation: 2
-                }}
-              />
-            ))}
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 32 }} keyboardShouldPersistTaps="handled">
+        <FieldLabel fin={fin}>Nome do time</FieldLabel>
+        <FieldPill fin={fin} value={name} onChangeText={setName} placeholder="Ex: Blues Masc" />
+
+        <View style={{ marginTop: 20, marginBottom: 24 }}>
+          <FieldLabel fin={fin}>Cor do time</FieldLabel>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
+            {TEAM_COLORS.map(color => {
+              const sel = selectedColor === color;
+              return (
+                <Pressable
+                  key={color}
+                  onPress={() => setSelectedColor(color)}
+                  style={{
+                    width: 42, height: 42, borderRadius: 21, backgroundColor: color,
+                    alignItems: 'center', justifyContent: 'center',
+                    borderWidth: sel ? 3 : 0, borderColor: fin.ink,
+                  }}
+                >
+                  {sel && <MaterialIcons name="check" size={20} color="#fff" />}
+                </Pressable>
+              );
+            })}
           </View>
         </View>
-        
-        <Button 
-          mode="contained" 
-          onPress={handleSave} 
-          loading={saving} 
-          disabled={!name.trim() || saving}
-          style={{ marginTop: 16, backgroundColor: selectedColor }}
-        >
-          Salvar Time
-        </Button>
-      </View>
+
+        <PillButton label="Salvar time" onPress={handleSave} fin={fin} loading={saving} disabled={!name.trim()} />
+      </ScrollView>
     </View>
   );
 }

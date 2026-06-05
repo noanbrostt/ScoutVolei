@@ -1,151 +1,122 @@
-import { View, FlatList, ScrollView } from 'react-native';
-import { Text, Appbar, Chip, Avatar, Card, useTheme, Surface, Divider } from 'react-native-paper';
+import { View, FlatList, Pressable } from 'react-native';
+import { Text } from 'react-native-paper';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState, useEffect, useRef } from 'react';
 import { playerService } from '../../../src/services/playerService';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFin } from '../../../src/theme';
+import { ScreenHeader, cardShadow } from '../../../src/components/ui';
 
 const MONTHS = [
-  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", 
-  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ];
 
 export default function BirthdaysScreen() {
   const router = useRouter();
-  const theme = useTheme();
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1); // Default to current month (1-12)
+  const fin = useFin();
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [birthdays, setBirthdays] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const monthsListRef = useRef<FlatList>(null);
 
-  useEffect(() => {
-    loadBirthdays();
-  }, [selectedMonth]);
+  useEffect(() => { loadBirthdays(); }, [selectedMonth]);
 
-  // Scroll to selected month on initial mount
   useEffect(() => {
-      // Small timeout to ensure layout is ready
-      setTimeout(() => {
-          try {
-            monthsListRef.current?.scrollToIndex({ 
-                index: selectedMonth - 1, 
-                animated: true, 
-                viewPosition: 0.5 // Center the item
-            });
-          } catch (e) {
-              // Ignore scroll errors if layout not ready
-          }
-      }, 500);
+    setTimeout(() => {
+      try {
+        monthsListRef.current?.scrollToIndex({ index: selectedMonth - 1, animated: true, viewPosition: 0.5 });
+      } catch {}
+    }, 500);
   }, []);
 
   const loadBirthdays = async () => {
     setLoading(true);
     try {
-        const data = await playerService.getBirthdaysByMonth(selectedMonth);
-        setBirthdays(data);
+      const data = await playerService.getBirthdaysByMonth(selectedMonth);
+      setBirthdays(data);
     } catch (e) {
-        console.error(e);
+      console.error(e);
     } finally {
-        setLoading(false);
+      setLoading(false);
     }
   };
 
   const getDayFromDate = (dateStr: string) => {
-      if (!dateStr) return '';
-      if (dateStr.includes('/')) return dateStr.split('/')[0];
-      if (dateStr.includes('-')) return dateStr.split('-')[2];
-      return '';
+    if (!dateStr) return '';
+    if (dateStr.includes('/')) return dateStr.split('/')[0];
+    if (dateStr.includes('-')) return dateStr.split('-')[2];
+    return '';
   };
 
   return (
-    <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-      <Appbar.Header elevated style={{ backgroundColor: theme.colors.primary }}>
-        <Appbar.BackAction onPress={() => router.back()} color="#FFFFFF" />
-        <Appbar.Content title="Aniversariantes" titleStyle={{ color: '#FFFFFF', fontWeight: 'bold' }} />
-      </Appbar.Header>
+    <View style={{ flex: 1, backgroundColor: fin.bg }}>
+      <ScreenHeader title="Aniversariantes" onBack={() => router.back()} fin={fin} />
 
+      {/* Month selector */}
       <View>
         <FlatList
-            ref={monthsListRef}
-            data={MONTHS}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ padding: 16, paddingRight: 32 }}
-            keyExtractor={(item) => item}
-            onScrollToIndexFailed={(info) => {
-                const wait = new Promise(resolve => setTimeout(resolve, 500));
-                wait.then(() => {
-                    monthsListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
-                });
-            }}
-            renderItem={({ item, index }) => {
-                const monthNum = index + 1;
-                const isSelected = selectedMonth === monthNum;
-                return (
-                    <Chip
-                        selected={isSelected}
-                        showSelectedOverlay
-                        onPress={() => setSelectedMonth(monthNum)}
-                        style={{ marginRight: 8, backgroundColor: isSelected ? theme.colors.primaryContainer : theme.colors.surface }}
-                        textStyle={{ fontWeight: isSelected ? 'bold' : 'normal' }}
-                    >
-                        {item}
-                    </Chip>
-                );
-            }}
+          ref={monthsListRef}
+          data={MONTHS}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10, gap: 8 }}
+          keyExtractor={item => item}
+          onScrollToIndexFailed={info => {
+            new Promise(resolve => setTimeout(resolve, 500)).then(() => {
+              monthsListRef.current?.scrollToIndex({ index: info.index, animated: true, viewPosition: 0.5 });
+            });
+          }}
+          renderItem={({ item, index }) => {
+            const monthNum = index + 1;
+            const sel = selectedMonth === monthNum;
+            return (
+              <Pressable
+                onPress={() => setSelectedMonth(monthNum)}
+                style={{ borderWidth: 1.5, borderColor: sel ? fin.brand : fin.line, backgroundColor: sel ? fin.brand : 'transparent', borderRadius: 20, paddingVertical: 8, paddingHorizontal: 16 }}
+              >
+                <Text style={{ fontWeight: '700', fontSize: 13.5, color: sel ? '#fff' : fin.sub }}>{item}</Text>
+              </Pressable>
+            );
+          }}
         />
       </View>
 
       <FlatList
         data={birthdays}
-        keyExtractor={(item) => item.player.id}
-        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
-        ListEmptyComponent={
-            !loading ? (
-                <View style={{ alignItems: 'center', marginTop: 40, opacity: 0.6 }}>
-                    <Avatar.Icon size={64} icon="cake-variant-outline" style={{ backgroundColor: 'transparent' }} color={theme.colors.onSurface} />
-                    <Text variant="bodyLarge" style={{ marginTop: 16 }}>Nenhum aniversariante em {MONTHS[selectedMonth-1]}</Text>
-                </View>
-            ) : null
-        }
-        renderItem={({ item }) => (
-            <Surface 
-                style={{ 
-                    marginBottom: 12, 
-                    borderRadius: 12, 
-                    backgroundColor: theme.colors.surface,
-                    elevation: 1
-                }}
-            >
-                <View style={{ flexDirection: 'row', padding: 16, alignItems: 'center' }}>
-                    <View style={{ 
-                        alignItems: 'center', 
-                        justifyContent: 'center', 
-                        width: 50, 
-                        height: 50, 
-                        borderRadius: 25, 
-                        backgroundColor: theme.colors.secondaryContainer,
-                        marginRight: 16
-                    }}>
-                        <Text variant="titleLarge" style={{ fontWeight: 'bold', color: theme.colors.onSecondaryContainer }}>
-                            {getDayFromDate(item.player.birthday)}
-                        </Text>
-                        <Text variant="labelSmall" style={{ marginTop: -2, opacity: 0.7 }}>
-                           {MONTHS[selectedMonth-1].substring(0,3)}
-                        </Text>
-                    </View>
-
-                    <View style={{ flex: 1 }}>
-                        <Text variant="titleMedium" style={{ fontWeight: 'bold' }}>
-                            {item.player.surname || item.player.name.split(' ')[0]}
-                        </Text>
-                        <Text variant="bodyMedium" style={{ color: theme.colors.primary }}>
-                            {item.teamName || 'Sem Time'}
-                        </Text>
-                    </View>
-                </View>
-            </Surface>
-        )}
+        keyExtractor={item => item.player.id}
+        contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 4, paddingBottom: 40 }}
+        ListEmptyComponent={!loading ? (
+          <View style={{ alignItems: 'center', marginTop: 50, gap: 14 }}>
+            <MaterialIcons name="cake" size={56} color={fin.sub} style={{ opacity: 0.5 }} />
+            <Text style={{ fontSize: 15, fontWeight: '600', color: fin.sub, textAlign: 'center' }}>
+              Nenhum aniversariante em {MONTHS[selectedMonth - 1]}
+            </Text>
+          </View>
+        ) : null}
+        renderItem={({ item }) => {
+          const teamColor = item.teamColor || fin.brand;
+          return (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: fin.surface, borderRadius: 14, padding: 12, marginBottom: 10, ...cardShadow(fin) }}>
+              <View style={{ width: 52, height: 52, borderRadius: 13, backgroundColor: teamColor + '22', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontWeight: '800', fontSize: 20, color: teamColor, lineHeight: 22, fontVariant: ['tabular-nums'] }}>
+                  {getDayFromDate(item.player.birthday)}
+                </Text>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: teamColor, opacity: 0.8, textTransform: 'uppercase' }}>
+                  {MONTHS[selectedMonth - 1].substring(0, 3)}
+                </Text>
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text numberOfLines={1} style={{ fontWeight: '800', fontSize: 16, color: fin.ink, letterSpacing: -0.2 }}>
+                  {item.player.surname || item.player.name.split(' ')[0]}
+                </Text>
+                <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '600', color: teamColor, marginTop: 1 }}>
+                  {item.teamName || 'Sem time'}
+                </Text>
+              </View>
+            </View>
+          );
+        }}
       />
     </View>
   );

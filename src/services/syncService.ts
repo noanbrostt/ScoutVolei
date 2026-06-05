@@ -20,12 +20,17 @@ const toFirestoreDoc = (item: any) => {
 
 export const syncService = {
 
-    syncAll: async () => {
+    // onProgress reports a 0..1 fraction across the sync steps (9 push + 8 pull = 17).
+    syncAll: async (onProgress?: (fraction: number) => void) => {
         const networkState = await Network.getNetworkStateAsync();
         if (!networkState.isConnected || !networkState.isInternetReachable) {
             console.log('Offline, skipping sync.');
             return;
         }
+
+        const TOTAL_STEPS = 17; // 9 push methods + 8 pull collections
+        let done = 0;
+        const tick = () => { done += 1; onProgress?.(Math.min(done / TOTAL_STEPS, 1)); };
 
         console.log('Starting sync cycle...');
         try {
@@ -33,19 +38,20 @@ export const syncService = {
             // Read pending items from SQLite first (short read-only queries),
             // then do Firestore network calls outside any transaction,
             // then update SQLite sync status in small write transactions.
-            await syncService.syncDeleted();
-            await syncService.syncTeams();
-            await syncService.syncPlayers();
-            await syncService.syncMatches();
-            await syncService.syncMatchActions();
-            await syncService.syncMonthlyFeeConfig();
-            await syncService.syncPayments();
-            await syncService.syncTreasuryEvents();
-            await syncService.syncEventPayments();
+            await syncService.syncDeleted(); tick();
+            await syncService.syncTeams(); tick();
+            await syncService.syncPlayers(); tick();
+            await syncService.syncMatches(); tick();
+            await syncService.syncMatchActions(); tick();
+            await syncService.syncMonthlyFeeConfig(); tick();
+            await syncService.syncPayments(); tick();
+            await syncService.syncTreasuryEvents(); tick();
+            await syncService.syncEventPayments(); tick();
 
-            // 2. PULL: Get remote changes from Firestore
-            await syncService.pullFromFirestore();
+            // 2. PULL: Get remote changes from Firestore (reports its 8 collections)
+            await syncService.pullFromFirestore(tick);
 
+            onProgress?.(1);
             console.log('Sync cycle finished successfully.');
             syncService.notifyListeners();
         } catch (error) {
@@ -180,7 +186,7 @@ export const syncService = {
 
     // --- PULL METHODS (Cloud -> Local) ---
 
-    pullFromFirestore: async () => {
+    pullFromFirestore: async (onStep?: () => void) => {
         const lastSync = await AsyncStorage.getItem(LAST_SYNC_KEY);
         // Default to a very old date if never synced
         const lastSyncDate = lastSync ? new Date(lastSync) : new Date(0); 
@@ -210,6 +216,7 @@ export const syncService = {
             const data = doc.data();
             await upsertLocal(teams, data);
         }
+        onStep?.();
 
         // 2. Players
         const playersQ = query(collection(firestoreDb, 'players'), where('updatedAt', '>', lastSyncDate.toISOString()));
@@ -218,6 +225,7 @@ export const syncService = {
             const data = doc.data();
             await upsertLocal(players, data);
         }
+        onStep?.();
 
         // 3. Matches
         const matchesQ = query(collection(firestoreDb, 'matches'), where('updatedAt', '>', lastSyncDate.toISOString()));
@@ -230,6 +238,7 @@ export const syncService = {
             }
             await upsertLocal(matches, data);
         }
+        onStep?.();
 
         // 4. Match Actions (using timestamp)
         const actionsQ = query(collection(firestoreDb, 'matchActions'), where('timestamp', '>', lastSyncDate.toISOString()));
@@ -238,6 +247,7 @@ export const syncService = {
             const data = doc.data();
             await upsertLocal(matchActions, data);
         }
+        onStep?.();
 
         // 5. Monthly fee configs
         const feeConfigQ = query(collection(firestoreDb, 'monthlyFeeConfig'), where('updatedAt', '>', lastSyncDate.toISOString()));
@@ -245,6 +255,7 @@ export const syncService = {
         for (const docSnap of feeConfigSnap.docs) {
             await upsertLocal(monthlyFeeConfig, docSnap.data());
         }
+        onStep?.();
 
         // 6. Payments
         const paymentsQ = query(collection(firestoreDb, 'payments'), where('updatedAt', '>', lastSyncDate.toISOString()));
@@ -252,6 +263,7 @@ export const syncService = {
         for (const docSnap of paymentsSnap.docs) {
             await upsertLocal(payments, docSnap.data());
         }
+        onStep?.();
 
         // 7. Treasury events
         const teventsQ = query(collection(firestoreDb, 'treasuryEvents'), where('updatedAt', '>', lastSyncDate.toISOString()));
@@ -259,6 +271,7 @@ export const syncService = {
         for (const docSnap of teventsSnap.docs) {
             await upsertLocal(treasuryEvents, docSnap.data());
         }
+        onStep?.();
 
         // 8. Event payments
         const epaymentsQ = query(collection(firestoreDb, 'eventPayments'), where('updatedAt', '>', lastSyncDate.toISOString()));
@@ -266,6 +279,7 @@ export const syncService = {
         for (const docSnap of epaymentsSnap.docs) {
             await upsertLocal(eventPayments, docSnap.data());
         }
+        onStep?.();
 
         // Update last sync time
         await AsyncStorage.setItem(LAST_SYNC_KEY, now);

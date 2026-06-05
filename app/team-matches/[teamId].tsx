@@ -1,5 +1,6 @@
-import { View, FlatList, RefreshControl, Alert } from 'react-native';
-import { Text, useTheme, FAB, Card, IconButton, ActivityIndicator, Icon, Appbar, Avatar } from 'react-native-paper';
+import { View, FlatList, RefreshControl, Alert, Pressable, ActivityIndicator } from 'react-native';
+import { Text } from 'react-native-paper';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback, useState, useEffect } from 'react';
@@ -7,12 +8,16 @@ import { matchService } from '../../src/services/matchService';
 import { teamService } from '../../src/services/teamService';
 import { useAuthStore } from '../../src/store/authStore';
 import { syncService } from '../../src/services/syncService';
+import { useFin } from '../../src/theme';
+import { Avatar } from '../../src/components/ui';
+import { MatchCard } from '../../src/components/MatchCard';
 
 export default function TeamMatches() {
-  const theme = useTheme();
+  const fin = useFin();
   const router = useRouter();
   const { teamId } = useLocalSearchParams<{ teamId: string }>();
   const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
   const [matches, setMatches] = useState<any[]>([]);
   const [team, setTeam] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -23,11 +28,7 @@ export default function TeamMatches() {
       matchService.getByTeam(teamId),
       teamService.getById(teamId),
     ]);
-
-    const visible = user?.role === 'admin'
-      ? allMatches
-      : allMatches.filter(m => m.isFinished);
-
+    const visible = isAdmin ? allMatches : allMatches.filter(m => m.isFinished);
     setMatches(visible);
     setTeam(teamData);
     setLoading(false);
@@ -41,129 +42,46 @@ export default function TeamMatches() {
   }, []);
 
   const handleMatchPress = (match: any) => {
-    if (match.isFinished) {
-      router.push(`/scout/report/${match.id}`);
-    } else {
-      router.push({ pathname: '/scout/[matchId]', params: { matchId: match.id } });
-    }
+    if (match.isFinished) router.push(`/scout/report/${match.id}`);
+    else router.push({ pathname: '/scout/[matchId]', params: { matchId: match.id } });
   };
 
   const handleDelete = (matchId: string) => {
-    Alert.alert(
-      'Excluir Partida',
-      'Tem certeza que deseja excluir esta partida e todo o seu histórico? Essa ação não pode ser desfeita.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Excluir', style: 'destructive', onPress: async () => {
-          await matchService.delete(matchId);
-          syncService.triggerSync();
-          loadData();
-        }},
-      ]
-    );
+    Alert.alert('Excluir partida', 'Tem certeza que deseja excluir esta partida e todo o seu histórico? Essa ação não pode ser desfeita.', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Excluir', style: 'destructive', onPress: async () => {
+        await matchService.delete(matchId);
+        syncService.triggerSync();
+        loadData();
+      }},
+    ]);
   };
 
-  const renderItem = ({ item }: { item: any }) => {
-    const date = new Date(item.date).toLocaleDateString('pt-BR', {
-      day: '2-digit', month: '2-digit', year: '2-digit',
-      hour: '2-digit', minute: '2-digit',
-    });
-    const resultColor = item.setsUs > item.setsThem ? '#4CAF50' : item.setsUs === item.setsThem ? '#FBC02D' : theme.colors.error;
-
-    return (
-      <Card
-        mode="elevated"
-        style={{ marginBottom: 12, backgroundColor: theme.colors.surface, borderLeftWidth: 4, borderLeftColor: resultColor }}
-        onPress={() => handleMatchPress(item)}
-      >
-        <Card.Content>
-          <View className="flex-row justify-between items-start">
-            <View className="flex-1">
-              <View className="flex-row items-center gap-2">
-                <Text variant="labelMedium" style={{ color: theme.colors.outline }}>{date}</Text>
-                {item.hasPendingData && (
-                  <Icon source="cloud-upload" size={16} color="#F9A825" />
-                )}
-              </View>
-              <View className="flex-row items-center gap-1 flex-wrap">
-                <Text variant="titleMedium" style={{ fontWeight: 'bold', fontSize: 19, color: item.teamColor || theme.colors.primary }}>{item.teamName}</Text>
-                <Text variant="bodyLarge" style={{ marginHorizontal: 4 }}>vs</Text>
-                <Text variant="titleMedium" style={{ fontWeight: 'bold', fontSize: 19 }}>{item.opponentName}</Text>
-              </View>
-              <Text variant="bodySmall">{item.location || 'Sem local'}</Text>
-            </View>
-            <View className="items-center gap-2">
-              <View style={{
-                borderWidth: 1,
-                borderColor: item.isFinished ? theme.colors.primary : '#FBC02D',
-                borderRadius: 12, padding: 4,
-                justifyContent: 'center', alignItems: 'center',
-              }}>
-                <Icon
-                  source={item.isFinished ? 'check' : 'clock-outline'}
-                  size={16}
-                  color={item.isFinished ? theme.colors.primary : '#FBC02D'}
-                />
-              </View>
-              {user?.role === 'admin' && (
-                <IconButton
-                  icon="trash-can-outline"
-                  size={20}
-                  iconColor={theme.colors.error}
-                  onPress={() => handleDelete(item.id)}
-                  style={{ margin: 0 }}
-                />
-              )}
-            </View>
-          </View>
-
-          <View style={{
-            flexDirection: 'row', marginTop: 8, alignItems: 'center',
-            justifyContent: 'center', gap: 16,
-            backgroundColor: theme.colors.surfaceVariant,
-            padding: 8, borderRadius: 8,
-          }}>
-            <View className="items-center" style={{ flex: 1 }}>
-              <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>SETS</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text variant="headlineMedium" style={{ fontWeight: 'bold', color: theme.colors.onSurfaceVariant }}>{item.setsUs}</Text>
-                <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>X</Text>
-                <Text variant="headlineMedium" style={{ fontWeight: 'bold', color: theme.colors.onSurfaceVariant }}>{item.setsThem}</Text>
-              </View>
-            </View>
-          </View>
-        </Card.Content>
-      </Card>
-    );
-  };
+  const headerColor = team?.color ?? fin.brand;
 
   return (
-    <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-      <SafeAreaView edges={['top']} style={{ backgroundColor: theme.colors.elevation.level2 }}>
-        <Appbar.Header style={{ backgroundColor: 'transparent' }} statusBarHeight={0}>
-          <Appbar.BackAction onPress={() => router.back()} />
-          {team && (
-            <Avatar.Text
-              size={32}
-              label={team.name.substring(0, 2).toUpperCase()}
-              style={{ backgroundColor: team.color || theme.colors.primary, marginRight: 8 }}
-              color="#FFF"
-            />
-          )}
-          <Appbar.Content title={team?.name ?? 'Partidas'} />
-        </Appbar.Header>
+    <View style={{ flex: 1, backgroundColor: fin.bg }}>
+      {/* Colored header with team color */}
+      <SafeAreaView edges={['top']} style={{ backgroundColor: headerColor }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 10, minHeight: 52 }}>
+          <Pressable onPress={() => router.back()} hitSlop={8}>
+            <MaterialIcons name="arrow-back" size={24} color="#fff" />
+          </Pressable>
+          {team && <Avatar name={team.name} color="rgba(255,255,255,0.25)" size={32} fontSize={12} fin={fin} />}
+          <Text numberOfLines={1} style={{ flex: 1, fontWeight: '800', fontSize: 19, color: '#fff', letterSpacing: -0.3 }}>
+            {team?.name ?? 'Partidas'}
+          </Text>
+        </View>
       </SafeAreaView>
 
       {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <ActivityIndicator animating size="large" color={theme.colors.primary} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator animating size="large" color={fin.brand} />
         </View>
       ) : matches.length === 0 ? (
-        <View className="flex-1 items-center justify-center px-8">
-          <Text variant="headlineSmall" style={{ fontWeight: 'bold', color: theme.colors.secondary }}>
-            Nenhuma partida
-          </Text>
-          <Text variant="bodyMedium" style={{ textAlign: 'center', marginTop: 8, opacity: 0.7 }}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+          <Text style={{ fontWeight: '800', fontSize: 20, color: fin.ink, textAlign: 'center' }}>Nenhuma partida</Text>
+          <Text style={{ fontSize: 14, color: fin.sub, fontWeight: '600', textAlign: 'center', marginTop: 8 }}>
             Nenhuma partida registrada para este time ainda.
           </Text>
         </View>
@@ -171,23 +89,27 @@ export default function TeamMatches() {
         <FlatList
           data={matches}
           keyExtractor={item => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+          renderItem={({ item }) => (
+            <MatchCard match={item} isAdmin={isAdmin} onPress={() => handleMatchPress(item)} onDelete={handleDelete} />
+          )}
+          contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 14, paddingBottom: 100 }}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={loadData} />}
         />
       )}
 
-      {user?.role === 'admin' && (
-        <FAB
-          icon="plus"
-          label="Novo Scout"
-          style={{
-            position: 'absolute', margin: 16, right: 0, bottom: 32,
-            backgroundColor: theme.colors.primary,
-          }}
-          color="#FFF"
+      {isAdmin && (
+        <Pressable
           onPress={() => router.push('/scout/setup')}
-        />
+          style={{
+            position: 'absolute', right: 18, bottom: 56,
+            flexDirection: 'row', alignItems: 'center', gap: 7,
+            backgroundColor: fin.brand, paddingVertical: 13, paddingHorizontal: 18, borderRadius: 16,
+            ...(fin.shadow === 'transparent' ? {} : { shadowColor: fin.brand, shadowOpacity: 0.4, shadowRadius: 18, shadowOffset: { width: 0, height: 6 }, elevation: 6 }),
+          }}
+        >
+          <MaterialIcons name="add" size={20} color="#fff" />
+          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14.5 }}>Novo scout</Text>
+        </Pressable>
       )}
     </View>
   );

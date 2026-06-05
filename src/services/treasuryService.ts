@@ -202,24 +202,51 @@ export const treasuryService = {
 
     if (evts.length === 0) return [];
 
-    const pendingRows = await db.select({ eventoId: eventPayments.eventoId })
-      .from(eventPayments)
+    const allRows = await db.select({
+      eventoId: eventPayments.eventoId,
+      atletaId: eventPayments.atletaId,
+      valorParcela: eventPayments.valorParcela,
+      valorPago: eventPayments.valorPago,
+      dataPagamento: eventPayments.dataPagamento,
+    }).from(eventPayments)
       .where(and(
         inArray(eventPayments.eventoId, evts.map(e => e.id)),
         eq(eventPayments.deleted, false),
-        isNull(eventPayments.dataPagamento),
       ));
 
-    const pendingCount = new Map<string, number>();
-    for (const row of pendingRows) {
-      pendingCount.set(row.eventoId, (pendingCount.get(row.eventoId) ?? 0) + 1);
+    // Per-event aggregates: money totals + athlete counts.
+    type Agg = { esperado: number; arrecadado: number; pending: number; atletas: Map<string, boolean> };
+    const agg = new Map<string, Agg>();
+    for (const row of allRows) {
+      let a = agg.get(row.eventoId);
+      if (!a) { a = { esperado: 0, arrecadado: 0, pending: 0, atletas: new Map() }; agg.set(row.eventoId, a); }
+      a.esperado += row.valorParcela;
+      const isPaid = !!row.dataPagamento;
+      a.arrecadado += isPaid ? (row.valorPago ?? row.valorParcela) : 0;
+      if (!isPaid) a.pending += 1;
+      // athlete is "fully paid" only if every one of their parcelas is paid
+      const prev = a.atletas.get(row.atletaId);
+      a.atletas.set(row.atletaId, (prev ?? true) && isPaid);
     }
 
-    const withStatus = evts.map(e => ({
-      ...e,
-      pendingCount: pendingCount.get(e.id) ?? 0,
-      allPaid: (pendingCount.get(e.id) ?? 0) === 0,
-    }));
+    const withStatus = evts.map(e => {
+      const a = agg.get(e.id);
+      const nAtletas = a ? a.atletas.size : 0;
+      const pagosAtletas = a ? [...a.atletas.values()].filter(Boolean).length : 0;
+      const esperado = a?.esperado ?? 0;
+      const arrecadado = a?.arrecadado ?? 0;
+      const pending = a?.pending ?? 0;
+      return {
+        ...e,
+        pendingCount: pending,
+        allPaid: nAtletas > 0 && pending === 0,
+        nAtletas,
+        pagosAtletas,
+        esperado,
+        arrecadado,
+        pct: esperado > 0 ? Math.round((arrecadado / esperado) * 100) : 0,
+      };
+    });
 
     withStatus.sort((a, b) => {
       if (a.allPaid !== b.allPaid) return a.allPaid ? 1 : -1;
@@ -424,12 +451,12 @@ export const treasuryService = {
     };
   },
 
-  // paid=true: auto-fills dataPagamento=today; paid=false: clears date
-  saveEventPayment: async (id: string, paid: boolean, valorPago?: number | null) => {
+  // paid=true: sets dataPagamento (defaults to today); paid=false: clears date
+  saveEventPayment: async (id: string, paid: boolean, valorPago?: number | null, dataPagamento?: string | null) => {
     const now = new Date().toISOString();
-    const today = now.split('T')[0];
+    const day = dataPagamento ?? now.split('T')[0];
     await db.update(eventPayments).set({
-      dataPagamento: paid ? today : null,
+      dataPagamento: paid ? day : null,
       valorPago: valorPago ?? null,
       updatedAt: now,
       syncStatus: 'pending',

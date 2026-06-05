@@ -1,12 +1,14 @@
-import { View, Alert } from 'react-native';
-import { Button, TextInput, Text, useTheme } from 'react-native-paper';
+import { View, Alert, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { Text } from 'react-native-paper';
 import { useRouter, Redirect } from 'expo-router';
 import { useState } from 'react';
 import { useAuthStore } from '../src/store/authStore';
+import { useFin } from '../src/theme';
+import { FieldLabel, FieldPill, PillButton, cardShadow } from '../src/components/ui';
 
 export default function LoginScreen() {
   const router = useRouter();
-  const theme = useTheme();
+  const fin = useFin();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const { login, user } = useAuthStore();
@@ -20,38 +22,40 @@ export default function LoginScreen() {
     if (success) {
       router.replace('/(app)/history');
     } else {
-      Alert.alert("Erro", "Usuário ou senha incorretos.");
+      Alert.alert('Erro', 'Usuário ou senha incorretos.');
     }
   };
 
   return (
-    <View className="flex-1 justify-center items-center p-4" style={{ backgroundColor: theme.colors.background }}>
-      <Text variant="headlineLarge" style={{ color: theme.colors.primary, marginBottom: 32, fontWeight: 'bold' }}>
-        Blues Voleibol
-      </Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={{ flex: 1, backgroundColor: fin.bg }}
+    >
+      <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 24 }}>
+        {/* Logo + title */}
+        <View style={{ alignItems: 'center', marginBottom: 32 }}>
+          <Image
+            source={require('../assets/icon.png')}
+            style={{ width: 88, height: 88, borderRadius: 24, marginBottom: 18, ...(fin.shadow === 'transparent' ? {} : { shadowColor: '#14213B', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 8 }) }}
+            resizeMode="cover"
+          />
+          <Text style={{ fontWeight: '800', fontSize: 28, color: fin.ink, letterSpacing: -0.5 }}>Blues Voleibol</Text>
 
-      <TextInput
-        label="Usuário"
-        value={username}
-        onChangeText={setUsername}
-        style={{ width: '100%', marginBottom: 16 }}
-        mode="outlined"
-        autoCapitalize="none"
-      />
+        </View>
 
-      <TextInput
-        label="Senha"
-        value={password}
-        onChangeText={setPassword}
-        style={{ width: '100%', marginBottom: 24 }}
-        mode="outlined"
-        secureTextEntry
-        autoCapitalize="none"
-      />
-
-      <Button mode="contained" onPress={handleLogin} style={{ width: '100%', paddingVertical: 4 }}>
-        Entrar
-      </Button>
-    </View>
+        {/* Form card */}
+        <View style={{ backgroundColor: fin.surface, borderRadius: 18, padding: 20, ...cardShadow(fin) }}>
+          <View style={{ marginBottom: 16 }}>
+            <FieldLabel fin={fin}>Usuário</FieldLabel>
+            <FieldPill fin={fin} value={username} onChangeText={setUsername} placeholder="Seu usuário" autoCapitalize="none" />
+          </View>
+          <View style={{ marginBottom: 20 }}>
+            <FieldLabel fin={fin}>Senha</FieldLabel>
+            <FieldPill fin={fin} value={password} onChangeText={setPassword} placeholder="Sua senha" secureTextEntry autoCapitalize="none" />
+          </View>
+          <PillButton label="Entrar" icon="login" fin={fin} onPress={handleLogin} disabled={!username.trim() || !password.trim()} />
+        </View>
+      </View>
+    </KeyboardAvoidingView>
   );
 }

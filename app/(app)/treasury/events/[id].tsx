@@ -1,116 +1,114 @@
-import { View, ScrollView, Alert, TouchableOpacity } from 'react-native';
-import { Text, useTheme, Appbar, Card, Chip, Portal, Dialog, TextInput } from 'react-native-paper';
+import { View, ScrollView, Alert, Pressable } from 'react-native';
+import { Text, useTheme, Portal, Dialog, TextInput as PaperInput } from 'react-native-paper';
+import { MaterialIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { useCallback, useState, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCallback, useState } from 'react';
 import { treasuryService } from '../../../../src/services/treasuryService';
 import { syncService } from '../../../../src/services/syncService';
 import { useAuthStore } from '../../../../src/store/authStore';
+import { useFin } from '../../../../src/theme';
+import {
+  money, toIsoDate, isoToShort,
+  cardShadow, Avatar, DateStepper, IconBtn,
+} from '../../../../src/components/treasury/finance-ui';
+
+type Parcela = {
+  id: string;
+  numeroParcela: number;
+  totalParcelas: number;
+  valorParcela: number;
+  valorPago: number | null;
+  dataPagamento: string | null;
+};
+
+const PARCELA_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
+const parcLabel = (n: number) => (n === 1 ? 'À vista' : `${n}x`);
+
+const getStatus = (p: Parcela): 'pago' | 'parcial' | 'pendente' => {
+  if (!p.dataPagamento) return 'pendente';
+  if (p.valorPago !== null && p.valorPago !== undefined && p.valorPago < p.valorParcela) return 'parcial';
+  return 'pago';
+};
+
+const summarize = (parcelas: Parcela[]) => {
+  let pagas = 0, pago = 0, totalValor = 0;
+  for (const p of parcelas) {
+    totalValor += p.valorParcela;
+    if (p.dataPagamento) {
+      pago += p.valorPago ?? p.valorParcela;
+      if (getStatus(p) === 'pago') pagas += 1;
+    }
+  }
+  const next = parcelas.find(p => getStatus(p) !== 'pago') ?? null;
+  return {
+    pagas, pago, totalValor,
+    total: parcelas[0]?.totalParcelas ?? parcelas.length,
+    next,
+    pct: totalValor > 0 ? Math.round((pago / totalValor) * 100) : 0,
+  };
+};
 
 export default function EventDetail() {
   const theme = useTheme();
+  const fin = useFin();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuthStore();
   const isTesoureiro = user?.role === 'financeiro';
 
   const [data, setData] = useState<Awaited<ReturnType<typeof treasuryService.getEventAthletes>>>(null);
+  const [payDate, setPayDate] = useState(new Date());
+  const [hidePaid, setHidePaid] = useState(false);
 
-  // Edit dialog state
-  const [dialogVisible, setDialogVisible] = useState(false);
-  const [selectedEp, setSelectedEp] = useState<any>(null);
-  const [inputValorPago, setInputValorPago] = useState('');
+  // Parcelas count picker
+  const [parcelasDialog, setParcelasDialog] = useState<{ atletaId: string; nome: string; current: number } | null>(null);
+
+  // Manage parcelas (long-press) — pay a specific value / undo
+  const [manage, setManage] = useState<{ nome: string; parcelas: Parcela[] } | null>(null);
+  const [editEp, setEditEp] = useState<Parcela | null>(null);
+  const [editValor, setEditValor] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // Parcelas picker dialog
-  const [parcelasDialogVisible, setParcelasDialogVisible] = useState(false);
-  const [parcelasAtletaId, setParcelasAtletaId] = useState('');
-  const [parcelasAtletaNome, setParcelasAtletaNome] = useState('');
-  const [currentTotalParcelas, setCurrentTotalParcelas] = useState(1);
-  const [collapsed, setCollapsed] = useState(false);
-
-  useEffect(() => {
-    AsyncStorage.getItem('treasury_event_collapsed').then(v => {
-      if (v !== null) setCollapsed(v === 'true');
-    });
-  }, []);
-
-  useEffect(() => {
-    AsyncStorage.setItem('treasury_event_collapsed', String(collapsed));
-  }, [collapsed]);
-
-  const load = async () => {
-    const result = await treasuryService.getEventAthletes(id);
-    setData(result);
-  };
-
+  const load = async () => setData(await treasuryService.getEventAthletes(id));
   useFocusEffect(useCallback(() => { load(); }, [id]));
 
-  const getParcelaStatus = (ep: any): 'pago' | 'parcial' | 'pendente' => {
-    if (!ep.dataPagamento) return 'pendente';
-    if (ep.valorPago !== null && ep.valorPago !== undefined && ep.valorPago < ep.valorParcela) return 'parcial';
-    return 'pago';
-  };
+  const adjustPayDate = (delta: number) =>
+    setPayDate(d => { const n = new Date(d); n.setDate(n.getDate() + delta); return n; });
 
-  const openPayDialog = (ep: any) => {
-    setSelectedEp(ep);
-    setInputValorPago(String(ep.valorParcela));
-    setDialogVisible(true);
-  };
-
-  const openEditDialog = (ep: any) => {
-    setSelectedEp(ep);
-    setInputValorPago(String(ep.valorPago ?? ep.valorParcela));
-    setDialogVisible(true);
-  };
-
-  const handleDirectPay = async (ep: any) => {
-    await treasuryService.saveEventPayment(ep.id, true, null);
+  const handleQuickPay = async (ep: Parcela) => {
+    await treasuryService.saveEventPayment(ep.id, true, null, toIsoDate(payDate));
     syncService.triggerSync();
     load();
   };
 
-  const handleDialogSave = async () => {
-    if (!selectedEp) return;
-    const valorPago = parseFloat(inputValorPago.replace(',', '.'));
-    const isFullPayment = Math.abs(valorPago - selectedEp.valorParcela) < 0.01;
+  const handleEditSave = async () => {
+    if (!editEp) return;
+    const valorPago = parseFloat(editValor.replace(',', '.'));
+    const isFull = Math.abs(valorPago - editEp.valorParcela) < 0.01;
     setSaving(true);
     try {
-      await treasuryService.saveEventPayment(selectedEp.id, true, isFullPayment ? null : valorPago);
+      await treasuryService.saveEventPayment(editEp.id, true, isFull ? null : valorPago, toIsoDate(payDate));
       syncService.triggerSync();
-      setDialogVisible(false);
+      setEditEp(null); setManage(null);
       load();
     } finally {
       setSaving(false);
     }
   };
 
-  const handleUnpay = async () => {
-    if (!selectedEp) return;
-    Alert.alert('Desfazer pagamento', 'Marcar esta parcela como pendente?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Confirmar', onPress: async () => {
-          await treasuryService.saveEventPayment(selectedEp.id, false, null);
-          syncService.triggerSync();
-          setDialogVisible(false);
-          load();
-        }
-      },
-    ]);
-  };
-
-  const openParcelasDialog = (atletaId: string, nome: string, parcelas: any[]) => {
-    setParcelasAtletaId(atletaId);
-    setParcelasAtletaNome(nome);
-    setCurrentTotalParcelas(parcelas[0]?.totalParcelas ?? 1);
-    setParcelasDialogVisible(true);
+  const handleUnpay = async (ep: Parcela) => {
+    await treasuryService.saveEventPayment(ep.id, false, null);
+    syncService.triggerSync();
+    setEditEp(null); setManage(null);
+    load();
   };
 
   const handleParcelasChange = async (newTotal: number) => {
-    setParcelasDialogVisible(false);
-    await treasuryService.adjustEventAtletaParcelas(id, parcelasAtletaId, newTotal);
+    if (!parcelasDialog) return;
+    const { atletaId } = parcelasDialog;
+    setParcelasDialog(null);
+    await treasuryService.adjustEventAtletaParcelas(id, atletaId, newTotal);
     syncService.triggerSync();
     load();
   };
@@ -129,215 +127,259 @@ export default function EventDetail() {
   };
 
   const event = data?.event;
-  const athletes = data?.athletes ?? [];
+  const athletes = (data?.athletes ?? []) as { atleta: any; team: any; parcelas: Parcela[] }[];
 
-  const statusColors = {
-    pago:     { bg: '#4CAF50', text: '#fff' },
-    parcial:  { bg: '#F57C00', text: '#fff' },
-    pendente: { bg: 'transparent', text: theme.colors.outline },
-  };
+  const isCamp = event?.tipo === 'campeonato';
+  const accent = isCamp ? fin.campeonato : fin.amistoso;
+  const accSoft = isCamp ? fin.campeonatoSoft : fin.amistosoSoft;
+
+  // Overall progress
+  const overall = (() => {
+    let esperado = 0, arrecadado = 0;
+    for (const a of athletes) {
+      for (const p of a.parcelas) {
+        esperado += p.valorParcela;
+        if (p.dataPagamento) arrecadado += p.valorPago ?? p.valorParcela;
+      }
+    }
+    return { esperado, arrecadado, pct: esperado > 0 ? Math.round((arrecadado / esperado) * 100) : 0 };
+  })();
+
+  const isQuitado = (parcelas: Parcela[]) => parcelas.length > 0 && parcelas.every(p => getStatus(p) === 'pago');
+  const visible = hidePaid ? athletes.filter(a => !isQuitado(a.parcelas)) : athletes;
+
+  const totalParcelasOf = (parcelas: Parcela[]) => parcelas[0]?.totalParcelas ?? 1;
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
+    <View style={{ flex: 1, backgroundColor: fin.bg }}>
       <SafeAreaView edges={['top']}>
-        <Appbar.Header statusBarHeight={0} style={{ backgroundColor: 'transparent', elevation: 0 }}>
-          <Appbar.BackAction onPress={() => router.back()} />
-          <Appbar.Content title={event?.nome ?? 'Evento'} />
-          {isTesoureiro && <Appbar.Action icon="delete" onPress={handleDeleteEvent} />}
-        </Appbar.Header>
+        {/* Header */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 6 }}>
+          <Pressable onPress={() => router.back()} hitSlop={8}>
+            <MaterialIcons name="arrow-back" size={24} color={fin.ink} />
+          </Pressable>
+          <View style={{ flex: 1 }} />
+          <IconBtn icon={hidePaid ? 'visibility-off' : 'visibility'} active={hidePaid} fin={fin} onPress={() => setHidePaid(v => !v)} />
+          {isTesoureiro && (
+            <Pressable onPress={handleDeleteEvent} hitSlop={8} style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
+              <MaterialIcons name="delete" size={22} color={fin.sub} />
+            </Pressable>
+          )}
+        </View>
+
+        {/* Event meta */}
+        {event && (
+          <View style={{ paddingHorizontal: 18, paddingBottom: 10 }}>
+            <Text style={{ fontWeight: '800', fontSize: 23, color: fin.ink, letterSpacing: -0.4 }}>{event.nome}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 }}>
+              <View style={{ backgroundColor: accSoft, paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6 }}>
+                <Text style={{ fontSize: 10.5, fontWeight: '800', letterSpacing: 0.4, textTransform: 'uppercase', color: accent }}>{event.tipo}</Text>
+              </View>
+              <Text style={{ fontSize: 13, color: fin.sub, fontWeight: '600' }}>
+                {money(event.valorPorAtleta)}/atleta
+                {' · '}{isoToShort(event.dataInicio)}{event.dataFim ? '–' + isoToShort(event.dataFim) : ''}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 13 }}>
+              <View style={{ flex: 1, height: 7, borderRadius: 4, backgroundColor: fin.track, overflow: 'hidden' }}>
+                <View style={{ width: `${overall.pct}%`, height: '100%', borderRadius: 4, backgroundColor: accent }} />
+              </View>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: fin.ink, fontVariant: ['tabular-nums'] }}>
+                {money(overall.arrecadado)} <Text style={{ color: fin.sub, fontWeight: '600' }}>/ {money(overall.esperado)}</Text>
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Count + date stepper */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingBottom: 10 }}>
+          <Text style={{ fontSize: 12.5, color: fin.sub, fontWeight: '700' }}>{athletes.length} atletas</Text>
+          {isTesoureiro && <DateStepper date={payDate} onStep={adjustPayDate} fin={fin} />}
+        </View>
       </SafeAreaView>
 
-      {event && (
-        <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-            <View style={{
-              backgroundColor: event.tipo === 'campeonato' ? '#7B1FA2' : '#1565C0',
-              paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12,
-            }}>
-              <Text style={{ color: '#fff', fontSize: 12 }}>{event.tipo}</Text>
-            </View>
-            <Text variant="bodyMedium" style={{ opacity: 0.7 }}>
-              R$ {event.valorPorAtleta.toFixed(2)}/atleta
-            </Text>
-            <View style={{ flex: 1 }} />
-            <Chip
-              compact
-              mode="outlined"
-              onPress={() => setCollapsed(v => !v)}
-              icon={collapsed ? 'chevron-down' : 'chevron-up'}
-              style={{ alignSelf: 'center' }}
-            >
-              {collapsed ? 'Expandir' : 'Recolher'}
-            </Chip>
-          </View>
-          {(() => {
-            const [y, m, d] = event.dataInicio.split('-');
-            const start = `${d}/${m}/${y}`;
-            if (!event.dataFim) return <Text variant="bodySmall" style={{ opacity: 0.5 }}>{start}</Text>;
-            const [y2, m2, d2] = event.dataFim.split('-');
-            return <Text variant="bodySmall" style={{ opacity: 0.5 }}>{start} → {`${d2}/${m2}/${y2}`}</Text>;
-          })()}
-        </View>
-      )}
-
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 32 }}>
-        {athletes.map(({ atleta, team, parcelas }) => {
+      <ScrollView contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 32 }}>
+        {visible.map(({ atleta, team, parcelas }) => {
           const nome = atleta.surname?.trim() || atleta.name;
-          const unpaidCount = parcelas.filter(p => !p.dataPagamento).length;
-          const nextPending = parcelas.find(p => !p.dataPagamento);
-          const totalParcelas = parcelas[0]?.totalParcelas ?? 1;
+          const color = team?.color ?? fin.brand;
+          const sm = summarize(parcelas);
+          const total = totalParcelasOf(parcelas);
+          // Última parcela com pagamento registrado (para desfazer).
+          const lastPaid = [...parcelas].reverse().find(p => !!p.dataPagamento) ?? null;
 
           return (
-            <Card key={atleta.id} mode="elevated"
-              style={{ marginBottom: 12, backgroundColor: theme.colors.elevation.level1 }}>
-              <View style={{ padding: 12 }}>
-                {/* Athlete header */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                  <View style={{
-                    width: 6, height: 32, borderRadius: 3,
-                    backgroundColor: team?.color ?? theme.colors.primary,
-                    marginRight: 10,
-                  }} />
-                  <Text variant="titleSmall" style={{ fontWeight: 'bold', flex: 1 }}>{nome}</Text>
-                  {isTesoureiro && (
-                    <Chip
-                      compact
-                      mode="outlined"
-                      onPress={() => openParcelasDialog(atleta.id, nome, parcelas)}
-                      style={{ marginLeft: 8 }}
-                    >
-                      {totalParcelas === 1 ? 'À vista' : `${totalParcelas}x`} ✎
-                    </Chip>
-                  )}
+            <Pressable
+              key={atleta.id}
+              onLongPress={isTesoureiro ? () => setManage({ nome, parcelas }) : undefined}
+              style={{ backgroundColor: fin.surface, borderRadius: 14, padding: 13, paddingLeft: 17, marginBottom: 10, overflow: 'hidden', ...cardShadow(fin) }}
+            >
+              <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, backgroundColor: color }} />
+
+              {/* Card header */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11 }}>
+                <Avatar name={nome} color={color} size={40} fontSize={15} fin={fin} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text numberOfLines={1} style={{ fontWeight: '800', fontSize: 16, color: fin.ink, letterSpacing: -0.2 }}>{nome}</Text>
+                  <Text style={{ fontSize: 12, color: fin.sub, fontWeight: '600', marginTop: 2 }}>{team?.name ?? ''}</Text>
+                </View>
+                <Pressable
+                  onPress={isTesoureiro ? () => setParcelasDialog({ atletaId: atleta.id, nome, current: total }) : undefined}
+                  style={{ borderWidth: 1.5, borderColor: fin.line, borderRadius: 9, paddingVertical: 5, paddingHorizontal: 10 }}
+                >
+                  <Text style={{ fontWeight: '700', fontSize: 12.5, color: fin.sub }}>{parcLabel(total)}</Text>
+                </Pressable>
+              </View>
+
+              {/* Bar body */}
+              <View style={{ marginTop: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                  <Text style={{ fontWeight: '800', fontSize: 16, color: fin.ink, fontVariant: ['tabular-nums'] }}>
+                    {money(sm.pago)} <Text style={{ fontSize: 13, color: fin.sub, fontWeight: '600' }}>/ {money(sm.totalValor)}</Text>
+                  </Text>
+                  <Text style={{ fontSize: 12.5, color: fin.sub, fontWeight: '700' }}>{sm.pagas} de {sm.total} pagas</Text>
                 </View>
 
-                {/* Quick pay next pending */}
-                {isTesoureiro && nextPending && (
-                  <View style={{
-                    flexDirection: 'row', alignItems: 'center',
-                    backgroundColor: theme.colors.primaryContainer,
-                    borderRadius: 10, padding: 10, marginBottom: 10,
-                  }}>
-                    <Text variant="bodySmall" style={{ flex: 1, color: theme.colors.onPrimaryContainer }}>
-                      Próxima: Parcela {nextPending.numeroParcela}/{nextPending.totalParcelas} · R$ {nextPending.valorParcela.toFixed(2)}
-                    </Text>
-                    <Chip
-                      compact mode="flat"
-                      style={{ backgroundColor: theme.colors.primary }}
-                      textStyle={{ color: '#fff', fontSize: 14 }}
-                      onPress={() => handleDirectPay(nextPending)}
-                    >
-                      ✓
-                    </Chip>
-                  </View>
-                )}
+                {/* Segmented bar */}
+                <View style={{ flexDirection: 'row', gap: 2, height: 8, marginTop: 8 }}>
+                  {parcelas.map(p => {
+                    const st = getStatus(p);
+                    return (
+                      <View key={p.id} style={{
+                        flex: 1, borderRadius: 2,
+                        backgroundColor: st === 'pago' ? fin.good : st === 'parcial' ? fin.warn : fin.track,
+                      }} />
+                    );
+                  })}
+                </View>
 
-                {/* All parcelas */}
-                {!collapsed && parcelas.map(p => {
-                  const status = getParcelaStatus(p);
-                  const sc = statusColors[status];
-                  return (
-                    <View key={p.id} style={{
-                      flexDirection: 'row', alignItems: 'center',
-                      paddingVertical: 6,
-                      borderTopWidth: 1, borderTopColor: theme.colors.surfaceVariant,
-                    }}>
-                      <Text variant="bodySmall" style={{ flex: 1, opacity: 0.7 }}>
-                        {p.numeroParcela}/{p.totalParcelas} · R$ {p.valorParcela.toFixed(2)}
-                      </Text>
-                      <View style={{
-                        backgroundColor: sc.bg,
-                        borderWidth: status === 'pendente' ? 1 : 0,
-                        borderColor: theme.colors.outline,
-                        paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10,
-                        marginRight: isTesoureiro && p.dataPagamento ? 4 : 0,
-                      }}>
-                        <Text style={{ color: sc.text, fontSize: 11 }}>
-                          {status === 'pago' ? 'Pago' : status === 'parcial' ? `Parcial R$${p.valorPago?.toFixed(2)}` : 'Pendente'}
+                {isTesoureiro && (sm.next || lastPaid) && (
+                  sm.next ? (
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 11 }}>
+                      <Pressable
+                        onPress={() => handleQuickPay(sm.next!)}
+                        style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1.5, borderColor: fin.brand, borderRadius: 12, paddingVertical: 9 }}
+                      >
+                        <MaterialIcons name="check" size={16} color={fin.brand} />
+                        <Text style={{ fontWeight: '800', fontSize: 13.5, color: fin.brand }}>
+                          Pagar {sm.next.numeroParcela}ª parcela · {money(sm.next.valorParcela)}
                         </Text>
-                      </View>
-                      {isTesoureiro && p.dataPagamento && (
-                        <Chip compact mode="outlined" onPress={() => openEditDialog(p)}
-                          style={{ marginLeft: 4 }}>
-                          ✎
-                        </Chip>
+                      </Pressable>
+                      {lastPaid && (
+                        <Pressable
+                          onPress={() => handleUnpay(lastPaid)}
+                          style={{ width: 46, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: theme.colors.error, borderRadius: 12 }}
+                        >
+                          <MaterialIcons name="undo" size={19} color={theme.colors.error} />
+                        </Pressable>
                       )}
                     </View>
-                  );
-                })}
+                  ) : (
+                    <Pressable
+                      onPress={() => handleUnpay(lastPaid!)}
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 11, borderWidth: 1.5, borderColor: theme.colors.error, borderRadius: 12, paddingVertical: 9 }}
+                    >
+                      <MaterialIcons name="undo" size={16} color={theme.colors.error} />
+                      <Text style={{ fontWeight: '800', fontSize: 13.5, color: theme.colors.error }}>
+                        Desfazer {lastPaid!.numeroParcela}ª parcela
+                      </Text>
+                    </Pressable>
+                  )
+                )}
               </View>
-            </Card>
+            </Pressable>
           );
         })}
       </ScrollView>
 
-      {/* Pay / Edit dialog */}
+      {/* Parcelas count picker */}
       <Portal>
-        <Dialog visible={dialogVisible} onDismiss={() => setDialogVisible(false)}>
-          <Dialog.Title>
-            {selectedEp?.dataPagamento ? 'Editar pagamento' : 'Registrar pagamento'}
-          </Dialog.Title>
+        <Dialog visible={!!parcelasDialog} onDismiss={() => setParcelasDialog(null)}>
+          <Dialog.Title>{parcelasDialog?.nome}</Dialog.Title>
           <Dialog.Content>
-            <Text variant="bodySmall" style={{ marginBottom: 12, opacity: 0.7 }}>
-              Parcela {selectedEp?.numeroParcela}/{selectedEp?.totalParcelas} · Valor cheio: R$ {selectedEp?.valorParcela?.toFixed(2)}
+            <Text style={{ fontSize: 12.5, color: fin.sub, fontWeight: '600', marginBottom: 12 }}>
+              Apenas parcelas não pagas serão alteradas.
             </Text>
-            <TextInput
-              label="Valor pago (R$)"
-              value={inputValorPago}
-              onChangeText={setInputValorPago}
-              mode="outlined"
-              keyboardType="decimal-pad"
-            />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {PARCELA_OPTIONS.map(n => {
+                const sel = parcelasDialog?.current === n;
+                return (
+                  <Pressable
+                    key={n}
+                    onPress={() => handleParcelasChange(n)}
+                    style={{ borderWidth: 1.5, borderColor: sel ? fin.brand : fin.line, backgroundColor: sel ? fin.brand : 'transparent', borderRadius: 9, paddingVertical: 6, paddingHorizontal: 12 }}
+                  >
+                    <Text style={{ fontWeight: '700', fontSize: 12.5, color: sel ? '#fff' : fin.sub }}>{parcLabel(n)}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </Dialog.Content>
+        </Dialog>
+      </Portal>
+
+      {/* Manage parcelas (long-press) */}
+      <Portal>
+        <Dialog visible={!!manage && !editEp} onDismiss={() => setManage(null)}>
+          <Dialog.Title>{manage?.nome}</Dialog.Title>
+          <Dialog.ScrollArea style={{ paddingHorizontal: 0 }}>
+            <ScrollView style={{ maxHeight: 360 }}>
+              {manage?.parcelas.map(p => {
+                const st = getStatus(p);
+                return (
+                  <Pressable
+                    key={p.id}
+                    onPress={() => { setEditEp(p); setEditValor(String(p.valorPago ?? p.valorParcela)); }}
+                    style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 24, borderTopWidth: 1, borderTopColor: fin.line }}
+                  >
+                    <Text style={{ width: 30, fontSize: 13, fontWeight: '700', color: fin.sub, fontVariant: ['tabular-nums'] }}>{p.numeroParcela}ª</Text>
+                    <Text style={{ flex: 1, fontSize: 13, color: fin.ink, fontWeight: '600', fontVariant: ['tabular-nums'] }}>{money(p.valorParcela)}</Text>
+                    {st === 'pago' ? (
+                      <View style={{ backgroundColor: fin.goodSoft, paddingVertical: 3, paddingHorizontal: 9, borderRadius: 12 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: fin.good }}>Pago</Text>
+                      </View>
+                    ) : st === 'parcial' ? (
+                      <View style={{ backgroundColor: fin.warnSoft, paddingVertical: 3, paddingHorizontal: 9, borderRadius: 12 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: fin.warn }}>{money(p.valorPago ?? 0)}</Text>
+                      </View>
+                    ) : (
+                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: fin.brand }}>Registrar ›</Text>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </Dialog.ScrollArea>
           <Dialog.Actions>
-            {selectedEp?.dataPagamento && (
-              <Chip compact mode="outlined" textStyle={{ color: theme.colors.error }}
-                style={{ borderColor: theme.colors.error, marginRight: 'auto' }}
-                onPress={handleUnpay}>
-                Desfazer
-              </Chip>
-            )}
-            <Chip compact onPress={() => setDialogVisible(false)}>Cancelar</Chip>
-            <Chip compact mode="flat"
-              style={{ backgroundColor: theme.colors.primary }}
-              textStyle={{ color: '#fff' }}
-              onPress={handleDialogSave}
-              disabled={saving}>
-              {saving ? '...' : 'Confirmar'}
-            </Chip>
+            <Pressable onPress={() => setManage(null)} style={{ paddingVertical: 8, paddingHorizontal: 16 }}>
+              <Text style={{ color: fin.brand, fontWeight: '700' }}>Fechar</Text>
+            </Pressable>
           </Dialog.Actions>
         </Dialog>
       </Portal>
 
-      {/* Parcelas picker dialog */}
+      {/* Edit single parcela */}
       <Portal>
-        <Dialog visible={parcelasDialogVisible} onDismiss={() => setParcelasDialogVisible(false)}>
-          <Dialog.Title>{parcelasAtletaNome}</Dialog.Title>
-          <Dialog.ScrollArea style={{ maxHeight: 320, paddingHorizontal: 0 }}>
-            <ScrollView>
-              <Text variant="bodySmall" style={{ opacity: 0.6, paddingHorizontal: 24, paddingTop: 8, paddingBottom: 4 }}>
-                Apenas parcelas não pagas serão alteradas.
-              </Text>
-              {Array.from({ length: 12 }, (_, i) => i + 1).map(n => (
-                <TouchableOpacity
-                  key={n}
-                  onPress={() => handleParcelasChange(n)}
-                  style={{
-                    flexDirection: 'row', alignItems: 'center',
-                    paddingVertical: 14, paddingHorizontal: 24,
-                    borderBottomWidth: 1, borderBottomColor: theme.colors.surfaceVariant,
-                  }}
-                >
-                  <Text variant="bodyMedium" style={{ flex: 1, color: theme.colors.onSurface }}>
-                    {n === 1 ? 'À vista' : `${n}x`}
-                  </Text>
-                  {currentTotalParcelas === n && (
-                    <Text style={{ color: theme.colors.primary, fontWeight: 'bold', fontSize: 16 }}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </Dialog.ScrollArea>
+        <Dialog visible={!!editEp} onDismiss={() => setEditEp(null)}>
+          <Dialog.Title>{editEp?.dataPagamento ? 'Editar pagamento' : 'Registrar pagamento'}</Dialog.Title>
+          <Dialog.Content>
+            <Text style={{ fontSize: 12.5, color: fin.sub, fontWeight: '600', marginBottom: 12 }}>
+              Parcela {editEp?.numeroParcela}/{editEp?.totalParcelas} · Valor cheio: {money(editEp?.valorParcela ?? 0)}
+            </Text>
+            <PaperInput label="Valor pago (R$)" value={editValor} onChangeText={setEditValor} mode="outlined" keyboardType="decimal-pad" />
+          </Dialog.Content>
+          <Dialog.Actions>
+            {editEp?.dataPagamento && (
+              <Pressable onPress={() => handleUnpay(editEp)} style={{ marginRight: 'auto', paddingVertical: 8, paddingHorizontal: 12 }}>
+                <Text style={{ color: theme.colors.error, fontWeight: '700' }}>Desfazer</Text>
+              </Pressable>
+            )}
+            <Pressable onPress={() => setEditEp(null)} style={{ paddingVertical: 8, paddingHorizontal: 12 }}>
+              <Text style={{ color: fin.sub, fontWeight: '700' }}>Cancelar</Text>
+            </Pressable>
+            <Pressable onPress={handleEditSave} disabled={saving} style={{ paddingVertical: 8, paddingHorizontal: 12 }}>
+              <Text style={{ color: fin.brand, fontWeight: '800' }}>{saving ? '...' : 'Confirmar'}</Text>
+            </Pressable>
+          </Dialog.Actions>
         </Dialog>
       </Portal>
     </View>

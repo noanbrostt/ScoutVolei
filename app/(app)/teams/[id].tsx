@@ -1,26 +1,28 @@
-import { View, FlatList, Alert, ScrollView, TouchableOpacity } from 'react-native';
-import { Text, FAB, Appbar, useTheme, IconButton, Surface, Avatar, Chip, Portal, Dialog, Button, Checkbox, Icon } from 'react-native-paper';
+import { View, FlatList, Alert, Pressable } from 'react-native';
+import { Text, Portal, Dialog } from 'react-native-paper';
+import { MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { teamService } from '../../../src/services/teamService';
 import { playerService } from '../../../src/services/playerService';
 import { useAuthStore } from '../../../src/store/authStore';
 import { syncService } from '../../../src/services/syncService';
+import { useFin } from '../../../src/theme';
+import { ScreenHeader, cardShadow, Avatar } from '../../../src/components/ui';
 
 const POSITIONS = ['Ponteiro', 'Central', 'Oposto', 'Levantador', 'Líbero'];
 
 export default function TeamDetails() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const theme = useTheme();
+  const fin = useFin();
   const [team, setTeam] = useState<any>(null);
   const [players, setPlayers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const user = useAuthStore(s => s.user); // Get user
-  
-  // Filter State
+  const user = useAuthStore(s => s.user);
+
   const [filterVisible, setFilterVisible] = useState(false);
-  const [selectedPositions, setSelectedPositions] = useState<string[]>([]); // Empty = All
+  const [selectedPositions, setSelectedPositions] = useState<string[]>([]);
 
   const loadData = async () => {
     setLoading(true);
@@ -38,16 +40,10 @@ export default function TeamDetails() {
     }
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-    }, [id])
-  );
+  useFocusEffect(useCallback(() => { loadData(); }, [id]));
 
   useEffect(() => {
-    const unsubscribe = syncService.subscribe(() => {
-      loadData();
-    });
+    const unsubscribe = syncService.subscribe(() => { loadData(); });
     return () => unsubscribe();
   }, [id]);
 
@@ -56,216 +52,171 @@ export default function TeamDetails() {
     if (selectedPositions.length > 0) {
       result = players.filter(p => selectedPositions.includes(p.position));
     }
-    // Sort by surname (nickname) or name
-    return result.sort((a, b) => {
-      const nameA = a.surname || a.name;
-      const nameB = b.surname || b.name;
-      return nameA.localeCompare(nameB);
-    });
+    return [...result].sort((a, b) => (a.surname || a.name).localeCompare(b.surname || b.name));
   }, [players, selectedPositions]);
 
   const togglePositionFilter = (pos: string) => {
-    if (selectedPositions.includes(pos)) {
-      setSelectedPositions(selectedPositions.filter(p => p !== pos));
-    } else {
-      setSelectedPositions([...selectedPositions, pos]);
-    }
+    setSelectedPositions(prev => prev.includes(pos) ? prev.filter(p => p !== pos) : [...prev, pos]);
   };
 
   const handleDeletePlayer = (playerId: string) => {
-    Alert.alert('Excluir Jogador', 'Tem certeza?', [
+    Alert.alert('Excluir jogador', 'Tem certeza?', [
       { text: 'Cancelar', style: 'cancel' },
-      { 
-        text: 'Excluir', 
-        style: 'destructive', 
-        onPress: async () => {
-          await playerService.delete(playerId);
-          syncService.triggerSync();
-          loadData();
-        }
-      }
+      { text: 'Excluir', style: 'destructive', onPress: async () => {
+        await playerService.delete(playerId);
+        syncService.triggerSync();
+        loadData();
+      }},
     ]);
   };
 
   const handleDeleteTeam = () => {
-    Alert.alert('Excluir Time', 'Tem certeza? Isso apagará todos os jogadores e dados associados.', [
+    Alert.alert('Excluir time', 'Tem certeza? Isso apagará todos os jogadores e dados associados.', [
       { text: 'Cancelar', style: 'cancel' },
-      { 
-        text: 'Excluir', 
-        style: 'destructive', 
-        onPress: async () => {
-          await teamService.delete(id as string);
-          syncService.triggerSync();
-          router.back();
-        }
-      }
+      { text: 'Excluir', style: 'destructive', onPress: async () => {
+        await teamService.delete(id as string);
+        syncService.triggerSync();
+        router.back();
+      }},
     ]);
   };
 
-  if (!team && !loading) return <View className="flex-1 justify-center items-center"><Text>Time não encontrado</Text></View>;
+  if (!team && !loading) {
+    return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: fin.bg }}><Text style={{ color: fin.sub }}>Time não encontrado</Text></View>;
+  }
 
   const isAdmin = user?.role === 'admin';
   const canManagePlayers = user?.role === 'admin' || user?.role === 'financeiro';
+  const headerColor = team?.color ?? fin.brand;
+
+  const HeaderAction = ({ icon, onPress }: { icon: keyof typeof MaterialIcons.glyphMap; onPress: () => void }) => (
+    <Pressable onPress={onPress} hitSlop={6} style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
+      <MaterialIcons name={icon} size={22} color="#fff" />
+    </Pressable>
+  );
 
   return (
-    <View className="flex-1" style={{ backgroundColor: theme.colors.background }}>
-      <Appbar.Header style={{ backgroundColor: team?.color || theme.colors.primary }}>
-        <Appbar.BackAction onPress={() => router.back()} color="#FFF" />
-        <Appbar.Content title={team?.name || 'Detalhes'} titleStyle={{ color: '#FFF', fontWeight: 'bold' }} />
-        
-        {/* Admin Actions */}
-        {isAdmin && (
-          <>
-                <Appbar.Action icon="export-variant" color="#FFF" onPress={() => router.push({ pathname: '/(app)/teams/export', params: { teamId: id } })} />
-                <Appbar.Action icon="pencil" color="#FFF" onPress={() => router.push({ pathname: '/(app)/teams/edit', params: { id } })} />
-                <Appbar.Action icon="delete" color="#FFF" onPress={handleDeleteTeam} />
-            </>
-        )}
-      </Appbar.Header>
+    <View style={{ flex: 1, backgroundColor: fin.bg }}>
+      <ScreenHeader
+        title={team?.name || 'Detalhes'}
+        onBack={() => router.back()}
+        fin={fin}
+        backgroundColor={headerColor}
+        tint="#fff"
+        right={isAdmin ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <HeaderAction icon="share" onPress={() => router.push({ pathname: '/(app)/teams/export', params: { teamId: id } })} />
+            <HeaderAction icon="edit" onPress={() => router.push({ pathname: '/(app)/teams/edit', params: { id } })} />
+            <HeaderAction icon="delete" onPress={handleDeleteTeam} />
+          </View>
+        ) : undefined}
+      />
 
-      <View className="flex-1 px-4 pt-4">
-        <View className="flex-row justify-between items-center mb-2">
-          <Text variant="titleMedium" style={{ fontWeight: 'bold', opacity: 0.7 }}>
+      <View style={{ flex: 1, paddingHorizontal: 14, paddingTop: 12 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, paddingHorizontal: 2 }}>
+          <Text style={{ fontWeight: '800', fontSize: 14, color: fin.sub, letterSpacing: 0.3, textTransform: 'uppercase' }}>
             Atletas ({filteredPlayers.length})
           </Text>
-          <View className="flex-row items-center">
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             {selectedPositions.length > 0 && (
-              <Button mode="text" compact onPress={() => setSelectedPositions([])}>
-                Limpar
-              </Button>
+              <Pressable onPress={() => setSelectedPositions([])} hitSlop={6} style={{ paddingHorizontal: 8, paddingVertical: 4 }}>
+                <Text style={{ color: fin.brand, fontWeight: '700', fontSize: 13 }}>Limpar</Text>
+              </Pressable>
             )}
-            <IconButton 
-              icon="filter-variant" 
-              mode="text"
-              iconColor={selectedPositions.length > 0 ? theme.colors.primary : theme.colors.onSurface}
-              onPress={() => setFilterVisible(true)} 
-            />
+            <Pressable
+              onPress={() => setFilterVisible(true)}
+              hitSlop={6}
+              style={{ width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: selectedPositions.length > 0 ? fin.brand : fin.eyeBg }}
+            >
+              <MaterialIcons name="filter-list" size={20} color={selectedPositions.length > 0 ? '#fff' : fin.sub} />
+            </Pressable>
           </View>
         </View>
-        
+
         <FlatList
           data={filteredPlayers}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           contentContainerStyle={{ paddingBottom: 100 }}
           renderItem={({ item }) => (
-            <Surface 
-              style={{ 
-                marginBottom: 8, 
-                borderRadius: 12, 
-                backgroundColor: theme.colors.elevation.level1,
-                overflow: 'hidden'
-              }}
-              elevation={1}
+            <Pressable
+              onPress={() => router.push({ pathname: '/(app)/teams/view-player', params: { playerId: item.id } })}
+              disabled={!canManagePlayers}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 11, backgroundColor: fin.surface, borderRadius: 14, padding: 11, marginBottom: 9, ...cardShadow(fin) }}
             >
-              <TouchableOpacity 
-                onPress={() => router.push({ pathname: '/(app)/teams/view-player', params: { playerId: item.id } })}
-                disabled={!canManagePlayers}
-              >
-                <View className="flex-row items-center p-3">
-                  {/* Info */}
-                  <View className="flex-1 mr-2">
-                    <View className="flex-row items-center gap-2">
-                        <Text variant="titleMedium" style={{ fontWeight: 'bold' }} numberOfLines={1}>
-                        {item.surname || item.name.split(' ')[0]}
-                        </Text>
-                        {item.syncStatus === 'pending' && (
-                            <Icon source="cloud-upload" size={20} color="#F9A825" />
-                        )}
-                    </View>
-                    {canManagePlayers && (
-                        <Text variant="bodySmall" style={{ opacity: 0.7 }} numberOfLines={1} ellipsizeMode="tail">
-                        {item.name}
-                        </Text>
-                    )}
-                  </View>
-
-                  {/* Actions Row - Compact */}
-                  <View className="flex-row items-center">
-                    <Chip 
-                      compact 
-                      mode="outlined" 
-                      style={{ marginRight: 8, height: 24, justifyContent: 'center' }} 
-                      textStyle={{ fontSize: 10, lineHeight: 10, marginVertical: 0, marginHorizontal: 6, textAlign: 'center' }}
-                    >
-                      {item.position}
-                    </Chip>
-                    
-                    {/* Player Actions */}
-                    {canManagePlayers && (
-                      <IconButton
-                        icon="pencil"
-                        size={20}
-                        onPress={() => router.push({ pathname: '/(app)/teams/edit-player', params: { playerId: item.id } })}
-                      />
-                    )}
-                    {isAdmin && (
-                      <IconButton
-                        icon="delete"
-                        size={20}
-                        iconColor={theme.colors.error}
-                        style={{ margin: 0, padding: 0 }}
-                        onPress={() => handleDeletePlayer(item.id)}
-                      />
-                    )}
-                  </View>
+              <Avatar name={item.surname || item.name} color={team?.color ?? fin.brand} size={40} fontSize={14} fin={fin} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text numberOfLines={1} style={{ fontWeight: '800', fontSize: 16, color: fin.ink, letterSpacing: -0.2 }}>
+                    {item.surname || item.name.split(' ')[0]}
+                  </Text>
+                  {item.syncStatus === 'pending' && <MaterialIcons name="cloud-upload" size={16} color={fin.warn} />}
                 </View>
-              </TouchableOpacity>
-            </Surface>
+                {canManagePlayers && (
+                  <Text numberOfLines={1} style={{ fontSize: 12.5, color: fin.sub, fontWeight: '600', marginTop: 1 }}>{item.name}</Text>
+                )}
+              </View>
+              <View style={{ backgroundColor: fin.field, borderRadius: 8, paddingVertical: 3, paddingHorizontal: 9 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: fin.sub }}>{item.position}</Text>
+              </View>
+              {canManagePlayers && (
+                <Pressable onPress={() => router.push({ pathname: '/(app)/teams/edit-player', params: { playerId: item.id } })} hitSlop={6} style={{ padding: 4 }}>
+                  <MaterialIcons name="edit" size={20} color={fin.sub} />
+                </Pressable>
+              )}
+              {isAdmin && (
+                <Pressable onPress={() => handleDeletePlayer(item.id)} hitSlop={6} style={{ padding: 4 }}>
+                  <MaterialIcons name="delete" size={20} color={fin.warn} />
+                </Pressable>
+              )}
+            </Pressable>
           )}
+          ListEmptyComponent={!loading ? (
+            <View style={{ alignItems: 'center', paddingTop: 40 }}>
+              <Text style={{ color: fin.sub, fontWeight: '600' }}>Nenhum atleta encontrado</Text>
+            </View>
+          ) : null}
         />
       </View>
 
       {canManagePlayers && (
-        <FAB
-            icon="account-plus"
-            label="Novo Jogador"
-            style={{
-            position: 'absolute',
-            margin: 16,
-            right: 0,
-            bottom: 0,
-            backgroundColor: theme.colors.primary
-            }}
-            color="#FFF"
-            onPress={() => router.push({ pathname: '/(app)/teams/add-player', params: { teamId: id } })}
-        />
+        <Pressable
+          onPress={() => router.push({ pathname: '/(app)/teams/add-player', params: { teamId: id } })}
+          style={{
+            position: 'absolute', right: 18, bottom: 18,
+            flexDirection: 'row', alignItems: 'center', gap: 7,
+            backgroundColor: fin.brand, paddingVertical: 13, paddingHorizontal: 18, borderRadius: 16,
+            ...(fin.shadow === 'transparent' ? {} : { shadowColor: fin.brand, shadowOpacity: 0.4, shadowRadius: 18, shadowOffset: { width: 0, height: 6 }, elevation: 6 }),
+          }}
+        >
+          <MaterialIcons name="person-add" size={20} color="#fff" />
+          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 14.5 }}>Novo jogador</Text>
+        </Pressable>
       )}
 
-      {/* Filter Dialog */}
+      {/* Filter dialog */}
       <Portal>
         <Dialog visible={filterVisible} onDismiss={() => setFilterVisible(false)}>
-          <Dialog.Title style={{ textAlign: 'center' }}>Filtrar por Posição</Dialog.Title>
+          <Dialog.Title>Filtrar por posição</Dialog.Title>
           <Dialog.Content>
-            <View className="flex-row flex-wrap gap-2 justify-center">
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {POSITIONS.map(pos => {
-                 const isSelected = selectedPositions.includes(pos);
-                 return (
-                   <Chip
-                     key={pos}
-                     mode="flat"
-                     selected={isSelected}
-                     showSelectedOverlay={false}
-                     icon={() => null} // Force no icon
-                     onPress={() => togglePositionFilter(pos)}
-                     style={{ 
-                       margin: 4,
-                       backgroundColor: isSelected ? theme.colors.primary : theme.colors.surfaceVariant,
-                       borderColor: isSelected ? theme.colors.primary : 'transparent',
-                       borderWidth: 1
-                     }}
-                     textStyle={{
-                       color: isSelected ? '#FFF' : theme.colors.onSurfaceVariant,
-                       fontWeight: isSelected ? 'bold' : 'normal'
-                     }}
-                   >
-                     {pos}
-                   </Chip>
-                 );
+                const sel = selectedPositions.includes(pos);
+                return (
+                  <Pressable
+                    key={pos}
+                    onPress={() => togglePositionFilter(pos)}
+                    style={{ borderWidth: 1.5, borderColor: sel ? fin.brand : fin.line, backgroundColor: sel ? fin.brand : 'transparent', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 14 }}
+                  >
+                    <Text style={{ fontWeight: '700', fontSize: 13.5, color: sel ? '#fff' : fin.sub }}>{pos}</Text>
+                  </Pressable>
+                );
               })}
             </View>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setFilterVisible(false)}>Fechar</Button>
+            <Pressable onPress={() => setFilterVisible(false)} style={{ paddingVertical: 8, paddingHorizontal: 16 }}>
+              <Text style={{ color: fin.brand, fontWeight: '700' }}>Fechar</Text>
+            </Pressable>
           </Dialog.Actions>
         </Dialog>
       </Portal>
