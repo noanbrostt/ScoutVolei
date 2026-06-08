@@ -65,6 +65,7 @@ export default function TeamsList() {
       ) : (
         <FlatList
           data={teams}
+          extraData={fin}
           keyExtractor={item => item.id}
           contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 4, paddingBottom: 100 }}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={loadTeams} />}
@@ -74,9 +75,14 @@ export default function TeamsList() {
               style={{ flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: fin.surface, borderRadius: 14, padding: 14, marginBottom: 10, ...cardShadow(fin) }}
             >
               <Avatar name={item.name} color={item.color ?? fin.brand} size={44} fin={fin} />
-              <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text numberOfLines={1} style={{ fontWeight: '800', fontSize: 18, color: fin.ink, letterSpacing: -0.2 }}>{item.name}</Text>
-                {item.hasPendingData && <MaterialIcons name="cloud-upload" size={18} color={fin.warn} />}
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text numberOfLines={1} style={{ fontWeight: '800', fontSize: 18, color: fin.ink, letterSpacing: -0.2 }}>{item.name}</Text>
+                  {item.hasPendingData && <MaterialIcons name="cloud-upload" size={18} color={fin.warn} />}
+                </View>
+                <Text style={{ fontSize: 12.5, color: fin.sub, fontWeight: '600', marginTop: 1 }}>
+                  {item.playerCount} atleta{item.playerCount !== 1 ? 's' : ''}
+                </Text>
               </View>
               <MaterialIcons name="chevron-right" size={24} color={fin.sub} />
             </Pressable>

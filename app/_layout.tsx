@@ -6,12 +6,14 @@ import "../global.css";
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { db, dbReady, canUseSQLite } from '../src/database/db';
 import migrations from '../drizzle/migrations';
-import { View, Text, Platform } from 'react-native';
+import { View, Text, Image, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from "react";
 import { syncService } from "../src/services/syncService";
+import { useFin } from '../src/theme';
+import { CircularProgress } from '../src/components/ui';
 
 // Three separate components so hooks are never called conditionally.
 export default function RootLayout() {
@@ -66,10 +68,25 @@ function AppLayoutInner() {
     ...MaterialCommunityIcons.font,
   });
 
+  // First launch only: gate the UI behind a progress splash while the initial
+  // full pull runs (the one slow sync). Later launches sync in the background.
+  const [initialSyncing, setInitialSyncing] = useState(false);
+  const [syncFraction, setSyncFraction] = useState(0);
+
   useEffect(() => {
-    if (success && fontsLoaded) {
-      syncService.syncOnAppStart();
-    }
+    if (!(success && fontsLoaded)) return;
+    let cancelled = false;
+    (async () => {
+      const firstRun = !(await syncService.hasSyncedBefore());
+      if (firstRun) {
+        setInitialSyncing(true);
+        await syncService.syncAll(f => { if (!cancelled) setSyncFraction(f); });
+        if (!cancelled) setInitialSyncing(false);
+      } else {
+        syncService.syncOnAppStart();
+      }
+    })();
+    return () => { cancelled = true; };
   }, [success, fontsLoaded]);
 
   if (error) {
@@ -91,7 +108,28 @@ function AppLayoutInner() {
   return (
     <PaperProvider theme={theme}>
       <StatusBar hidden />
-      <Stack screenOptions={{ headerShown: false }} />
+      {initialSyncing
+        ? <InitialSyncSplash fraction={syncFraction} />
+        : <Stack screenOptions={{ headerShown: false }} />}
     </PaperProvider>
+  );
+}
+
+// One-time branded splash shown during the first full sync after install.
+function InitialSyncSplash({ fraction }: { fraction: number }) {
+  const fin = useFin();
+  return (
+    <View style={{ flex: 1, backgroundColor: fin.bg, alignItems: 'center', justifyContent: 'center', gap: 22, padding: 32 }}>
+      <Image
+        source={require('../assets/icon.jpg')}
+        style={{ width: 92, height: 92, borderRadius: 24 }}
+        resizeMode="cover"
+      />
+      <Text style={{ fontWeight: '800', fontSize: 22, color: fin.ink, letterSpacing: -0.4 }}>Blues Voleibol</Text>
+      <CircularProgress pct={fraction * 100} fin={fin} />
+      <Text style={{ fontSize: 13, color: fin.sub, fontWeight: '600', textAlign: 'center' }}>
+        Preparando seus dados pela primeira vez…
+      </Text>
+    </View>
   );
 }

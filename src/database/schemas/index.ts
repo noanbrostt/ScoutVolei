@@ -80,6 +80,7 @@ export const payments = sqliteTable('payments', {
   valorJuros: real('valor_juros').notNull().default(0),
   dataPagamento: text('data_pagamento'), // YYYY-MM-DD manual, null = pendente
   valorPago: real('valor_pago'), // null = pagamento completo; < valorBase = parcial
+  isento: integer('isento', { mode: 'boolean' }).default(false).notNull(), // mês dispensado (viagem/lesão/etc) — sai das contas
   observacao: text('observacao'),
   createdAt: text('created_at').notNull(),
   updatedAt: text('updated_at').notNull(),

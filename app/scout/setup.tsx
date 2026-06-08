@@ -2,7 +2,7 @@ import { View, ScrollView, Alert, Pressable } from 'react-native';
 import { Text, Portal, Dialog } from 'react-native-paper';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { teamService } from '../../src/services/teamService';
 import { playerService } from '../../src/services/playerService';
@@ -13,6 +13,7 @@ import { ScreenHeader, FieldLabel, FieldPill, PillButton, cardShadow, Avatar } f
 
 const MIN_PLAYERS = 6;
 const MAX_PLAYERS = 7;
+const POSITION_ORDER = ['Levantador', 'Ponteiro', 'Oposto', 'Central', 'Líbero'];
 
 function Check({ on, fin }: { on: boolean; fin: FinTokens }) {
   return (
@@ -37,6 +38,19 @@ export default function ScoutSetup() {
 
   const [teamModalVisible, setTeamModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [sortMode, setSortMode] = useState<'alpha' | 'position'>('alpha');
+
+  const byName = (a: any, b: any) => (a.surname || a.name).localeCompare(b.surname || b.name);
+  const displayedPlayers = useMemo(() => {
+    const arr = [...teamPlayers];
+    if (sortMode === 'alpha') return arr.sort(byName);
+    return arr.sort((a, b) => {
+      const ra = POSITION_ORDER.indexOf(a.position); const rb = POSITION_ORDER.indexOf(b.position);
+      const oa = ra === -1 ? POSITION_ORDER.length : ra;
+      const ob = rb === -1 ? POSITION_ORDER.length : rb;
+      return oa !== ob ? oa - ob : byName(a, b);
+    });
+  }, [teamPlayers, sortMode]);
 
   useEffect(() => { teamService.getAll().then(setTeams); }, []);
 
@@ -125,7 +139,21 @@ export default function ScoutSetup() {
         </View>
 
         {/* Escalação inicial */}
-        {sectionTitle('Escalação inicial', selectedTeam ? `${selectedPlayerIds.length} de ${MIN_PLAYERS}–${MAX_PLAYERS}` : undefined)}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, marginBottom: 12 }}>
+          <Text style={{ fontSize: 15, fontWeight: '800', color: fin.ink, letterSpacing: -0.2 }}>Escalação inicial</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            {selectedTeam && <Text style={{ fontSize: 13, fontWeight: '700', color: fin.brand }}>{`${selectedPlayerIds.length} de ${MIN_PLAYERS}–${MAX_PLAYERS}`}</Text>}
+            {selectedTeam && teamPlayers.length > 0 && (
+              <Pressable
+                onPress={() => setSortMode(m => (m === 'alpha' ? 'position' : 'alpha'))}
+                hitSlop={8}
+                style={{ width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: fin.field, borderWidth: 1, borderColor: fin.line }}
+              >
+                <MaterialIcons name={sortMode === 'alpha' ? 'sort-by-alpha' : 'groups'} size={19} color={fin.brand} />
+              </Pressable>
+            )}
+          </View>
+        </View>
 
         {!selectedTeam ? (
           <View style={{ backgroundColor: fin.surface, borderRadius: 14, padding: 18, ...cardShadow(fin) }}>
@@ -137,7 +165,7 @@ export default function ScoutSetup() {
           </View>
         ) : (
           <View style={{ backgroundColor: fin.surface, borderRadius: 14, overflow: 'hidden', ...cardShadow(fin) }}>
-            {teamPlayers.map((p, i) => {
+            {displayedPlayers.map((p, i) => {
               const on = selectedPlayerIds.includes(p.id);
               return (
                 <Pressable

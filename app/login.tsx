@@ -1,7 +1,7 @@
-import { View, Alert, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { View, Alert, KeyboardAvoidingView, Image, ScrollView, TextInput } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useRouter, Redirect } from 'expo-router';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useAuthStore } from '../src/store/authStore';
 import { useFin } from '../src/theme';
 import { FieldLabel, FieldPill, PillButton, cardShadow } from '../src/components/ui';
@@ -11,6 +11,7 @@ export default function LoginScreen() {
   const fin = useFin();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const passwordRef = useRef<TextInput>(null);
   const { login, user } = useAuthStore();
 
   if (user) {
@@ -28,10 +29,14 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
       style={{ flex: 1, backgroundColor: fin.bg }}
     >
-      <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 24 }}>
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 32 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         {/* Logo + title */}
         <View style={{ alignItems: 'center', marginBottom: 32 }}>
           <Image
@@ -47,15 +52,15 @@ export default function LoginScreen() {
         <View style={{ backgroundColor: fin.surface, borderRadius: 18, padding: 20, ...cardShadow(fin) }}>
           <View style={{ marginBottom: 16 }}>
             <FieldLabel fin={fin}>Usuário</FieldLabel>
-            <FieldPill fin={fin} value={username} onChangeText={setUsername} placeholder="Seu usuário" autoCapitalize="none" />
+            <FieldPill fin={fin} value={username} onChangeText={setUsername} placeholder="Seu usuário" autoCapitalize="none" returnKeyType="next" onSubmitEditing={() => passwordRef.current?.focus()} />
           </View>
           <View style={{ marginBottom: 20 }}>
             <FieldLabel fin={fin}>Senha</FieldLabel>
-            <FieldPill fin={fin} value={password} onChangeText={setPassword} placeholder="Sua senha" secureTextEntry autoCapitalize="none" />
+            <FieldPill ref={passwordRef} fin={fin} value={password} onChangeText={setPassword} placeholder="Sua senha" secureTextEntry autoCapitalize="none" returnKeyType="go" onSubmitEditing={handleLogin} />
           </View>
           <PillButton label="Entrar" icon="login" fin={fin} onPress={handleLogin} disabled={!username.trim() || !password.trim()} />
         </View>
-      </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }

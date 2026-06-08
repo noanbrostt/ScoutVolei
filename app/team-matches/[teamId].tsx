@@ -88,6 +88,7 @@ export default function TeamMatches() {
       ) : (
         <FlatList
           data={matches}
+          extraData={fin}
           keyExtractor={item => item.id}
           renderItem={({ item }) => (
             <MatchCard match={item} isAdmin={isAdmin} onPress={() => handleMatchPress(item)} onDelete={handleDelete} />

@@ -133,6 +133,7 @@ export const treasuryService = {
         valorJuros: data.valorJuros,
         valorPago: data.valorPago,
         dataPagamento: data.dataPagamento,
+        isento: false, // registrar pagamento sempre tira a isenção
         updatedAt: now,
         syncStatus: 'pending',
       }).where(eq(payments.id, data.id));
@@ -152,6 +153,144 @@ export const treasuryService = {
         updatedAt: now,
       });
     }
+  },
+
+  // Mark/unmark a single month as exempt (viagem, lesão, etc). Exempt months
+  // are dropped from every total — they don't count as paid nor as pending.
+  setIsento: async (data: {
+    id?: string;
+    atletaId: string;
+    teamId: string;
+    mesReferencia: string;
+    isento: boolean;
+    valorBase: number;
+  }) => {
+    const now = new Date().toISOString();
+    if (data.id) {
+      await db.update(payments).set({
+        isento: data.isento,
+        // isentar limpa qualquer registro de pagamento daquele mês
+        ...(data.isento ? { dataPagamento: null, valorPago: null, valorSolidario: 0, valorJuros: 0 } : {}),
+        updatedAt: now,
+        syncStatus: 'pending',
+      }).where(eq(payments.id, data.id));
+    } else {
+      await db.insert(payments).values({
+        id: Crypto.randomUUID(),
+        atletaId: data.atletaId,
+        teamId: data.teamId,
+        mesReferencia: data.mesReferencia,
+        valorBase: data.valorBase,
+        valorSolidario: 0,
+        valorJuros: 0,
+        valorPago: null,
+        dataPagamento: null,
+        isento: data.isento,
+        observacao: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  },
+
+  // Bulk exempt/un-exempt a set of athletes across a month range (inclusive).
+  // Exempting creates a payment row when none exists; un-exempting only touches
+  // existing rows (a month with no row simply goes back to pending).
+  setIsentoRange: async (params: {
+    atletas: { atletaId: string; teamId: string }[];
+    mesInicio: string; // YYYY-MM
+    mesFim: string;    // YYYY-MM
+    isento: boolean;
+  }) => {
+    const { atletas, isento } = params;
+    let [yi, mi] = params.mesInicio.split('-').map(Number);
+    let [yf, mf] = params.mesFim.split('-').map(Number);
+    if (yf < yi || (yf === yi && mf < mi)) { [yi, mi, yf, mf] = [yf, mf, yi, mi]; }
+
+    const months: string[] = [];
+    for (let y = yi, m = mi; y < yf || (y === yf && m <= mf);) {
+      months.push(`${y}-${String(m).padStart(2, '0')}`);
+      if (++m > 12) { m = 1; y++; }
+    }
+
+    const teamIds = [...new Set(atletas.map(a => a.teamId))];
+    const baseByTeam = new Map<string, number>();
+    for (const tid of teamIds) {
+      const c = await treasuryService.getFeeConfig(tid);
+      baseByTeam.set(tid, c?.valorBase ?? 0);
+    }
+
+    const now = new Date().toISOString();
+    for (const { atletaId, teamId } of atletas) {
+      for (const mes of months) {
+        const existing = await treasuryService.getPayment(atletaId, mes);
+        if (existing) {
+          await db.update(payments).set({
+            isento,
+            ...(isento ? { dataPagamento: null, valorPago: null, valorSolidario: 0, valorJuros: 0 } : {}),
+            updatedAt: now,
+            syncStatus: 'pending',
+          }).where(eq(payments.id, existing.id));
+        } else if (isento) {
+          await db.insert(payments).values({
+            id: Crypto.randomUUID(),
+            atletaId,
+            teamId,
+            mesReferencia: mes,
+            valorBase: baseByTeam.get(teamId) ?? 0,
+            valorSolidario: 0,
+            valorJuros: 0,
+            valorPago: null,
+            dataPagamento: null,
+            isento: true,
+            observacao: null,
+            createdAt: now,
+            updatedAt: now,
+          });
+        }
+      }
+    }
+  },
+
+  // Lists every athlete (of the given teams) that has at least one exempt month,
+  // with the sorted list of exempt months (YYYY-MM). For the "Mostrar isentos" view.
+  getIsencoes: async (teamIds: string[]) => {
+    if (teamIds.length === 0) return [];
+
+    const atletasRaw = await db.select({
+      id: players.id, name: players.name, surname: players.surname, teamId: players.teamId,
+    }).from(players)
+      .where(and(inArray(players.teamId, teamIds), eq(players.deleted, false)));
+    if (atletasRaw.length === 0) return [];
+
+    const atletaIds = atletasRaw.map(a => a.id);
+    const isentos = await db.select().from(payments)
+      .where(and(
+        inArray(payments.atletaId, atletaIds),
+        eq(payments.isento, true),
+        eq(payments.deleted, false),
+      ));
+
+    const teamsData = await db.select({ id: teams.id, name: teams.name, color: teams.color })
+      .from(teams).where(and(inArray(teams.id, teamIds), eq(teams.deleted, false)));
+    const teamMap = new Map(teamsData.map(t => [t.id, t]));
+
+    const byAthlete = new Map<string, string[]>();
+    for (const p of isentos) {
+      if (!byAthlete.has(p.atletaId)) byAthlete.set(p.atletaId, []);
+      byAthlete.get(p.atletaId)!.push(p.mesReferencia);
+    }
+
+    return atletasRaw
+      .filter(a => byAthlete.has(a.id))
+      .map(a => ({
+        atleta: a,
+        team: teamMap.get(a.teamId) ?? null,
+        meses: byAthlete.get(a.id)!.sort(),
+      }))
+      .sort((a, b) =>
+        `${a.atleta.name} ${a.atleta.surname ?? ''}`.trim()
+          .localeCompare(`${b.atleta.name} ${b.atleta.surname ?? ''}`.trim(), 'pt-BR'));
   },
 
   deletePayment: async (id: string) => {

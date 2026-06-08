@@ -82,6 +82,7 @@ export default function MatchesHistory() {
       ) : (
         <FlatList
           data={teams}
+          extraData={fin}
           keyExtractor={item => item.id}
           contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 4, paddingBottom: 100 }}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={loadData} />}

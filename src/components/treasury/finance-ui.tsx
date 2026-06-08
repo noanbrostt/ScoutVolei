@@ -1,7 +1,9 @@
 // Finance-specific building blocks (Blues). Generic primitives live in src/components/ui.tsx
 // and are re-exported here so existing treasury imports keep working.
-import { View, Text, Pressable } from 'react-native';
+import { useState } from 'react';
+import { View, Text, Pressable, Platform } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import Svg, { Circle } from 'react-native-svg';
 import { FinTokens } from '../../theme';
 import { formatDateBR } from '../ui';
@@ -40,8 +42,9 @@ export function Ring({ pct, fin, size = 78 }: { pct: number; fin: FinTokens; siz
 // ── Compact date stepper ([−] DD/MM/AAAA "data do pgto" [+]) ─────────────────
 
 export function DateStepper({
-  date, onStep, fin,
-}: { date: Date; onStep: (delta: number) => void; fin: FinTokens }) {
+  date, onStep, onSet, fin,
+}: { date: Date; onStep: (delta: number) => void; onSet?: (date: Date) => void; fin: FinTokens }) {
+  const [showPicker, setShowPicker] = useState(false);
   const Btn = ({ dir }: { dir: number }) => (
     <Pressable
       onPress={() => onStep(dir)}
@@ -58,13 +61,23 @@ export function DateStepper({
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
       <Btn dir={-1} />
-      <View style={{ alignItems: 'center' }}>
+      <Pressable onPress={onSet ? () => setShowPicker(true) : undefined} style={{ alignItems: 'center' }}>
         <Text style={{ fontWeight: '700', fontSize: 14, color: fin.ink, fontVariant: ['tabular-nums'] }}>
           {formatDateBR(date)}
         </Text>
         <Text style={{ fontSize: 9.5, color: fin.sub, fontWeight: '600' }}>data do pgto</Text>
-      </View>
+      </Pressable>
       <Btn dir={1} />
+      {showPicker && onSet && (
+        <DateTimePicker
+          value={date} mode="date" display="default"
+          onChange={(e, d) => {
+            setShowPicker(Platform.OS === 'ios');
+            if (e.type === 'dismissed') return;
+            if (d) onSet(d);
+          }}
+        />
+      )}
     </View>
   );
 }

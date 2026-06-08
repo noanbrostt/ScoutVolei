@@ -194,91 +194,75 @@ export const syncService = {
 
         console.log(`Pulling changes since ${lastSyncDate.toISOString()}...`);
 
-        // Helper to upsert local (handles tombstones with deleted: true)
-        const upsertLocal = async (table: any, data: any) => {
-            if (data.deleted) {
-                await db.delete(table).where(eq(table.id, data.id));
-                return;
+        // Apply a Firestore snapshot to a local table in ONE transaction.
+        // Tombstones (deleted: true) become local deletes; everything else is a
+        // single-statement UPSERT. Batching in one transaction (instead of a
+        // SELECT + INSERT/UPDATE per row, each auto-committed) is what keeps the
+        // first post-install pull — which fetches the entire DB — from freezing the UI.
+        const applySnap = async (
+            table: any,
+            docs: any[],
+            cascadeDelete?: (tx: any, id: string) => Promise<void>,
+        ) => {
+            const toDelete: string[] = [];
+            const toUpsert: any[] = [];
+            for (const d of docs) {
+                const data = d.data();
+                if (data.deleted) toDelete.push(data.id);
+                else toUpsert.push({ ...data, syncStatus: 'synced' });
             }
-            const existing = await db.select().from(table).where(eq(table.id, data.id)).get();
-            if (existing) {
-                await db.update(table).set({ ...data, syncStatus: 'synced' }).where(eq(table.id, data.id));
-            } else {
-                await db.insert(table).values({ ...data, syncStatus: 'synced' });
-            }
+            if (toDelete.length === 0 && toUpsert.length === 0) return;
+            await db.transaction(async (tx) => {
+                for (const id of toDelete) {
+                    if (cascadeDelete) await cascadeDelete(tx, id);
+                    await tx.delete(table).where(eq(table.id, id));
+                }
+                for (const row of toUpsert) {
+                    await tx.insert(table).values(row).onConflictDoUpdate({ target: table.id, set: row });
+                }
+            });
         };
 
-        // 1. Teams
-        // Note: Firestore stores dates as ISO strings in our schema logic
-        const teamsQ = query(collection(firestoreDb, 'teams'), where('updatedAt', '>', lastSyncDate.toISOString()));
-        const teamsSnap = await getDocs(teamsQ);
-        for (const doc of teamsSnap.docs) {
-            const data = doc.data();
-            await upsertLocal(teams, data);
-        }
+        // 1. Teams (Firestore stores dates as ISO strings in our schema logic)
+        const teamsSnap = await getDocs(query(collection(firestoreDb, 'teams'), where('updatedAt', '>', lastSyncDate.toISOString())));
+        await applySnap(teams, teamsSnap.docs);
         onStep?.();
 
         // 2. Players
-        const playersQ = query(collection(firestoreDb, 'players'), where('updatedAt', '>', lastSyncDate.toISOString()));
-        const playersSnap = await getDocs(playersQ);
-        for (const doc of playersSnap.docs) {
-            const data = doc.data();
-            await upsertLocal(players, data);
-        }
+        const playersSnap = await getDocs(query(collection(firestoreDb, 'players'), where('updatedAt', '>', lastSyncDate.toISOString())));
+        await applySnap(players, playersSnap.docs);
         onStep?.();
 
-        // 3. Matches
-        const matchesQ = query(collection(firestoreDb, 'matches'), where('updatedAt', '>', lastSyncDate.toISOString()));
-        const matchesSnap = await getDocs(matchesQ);
-        for (const doc of matchesSnap.docs) {
-            const data = doc.data();
-            if (data.deleted) {
-                // Cascade: remove all local actions for this match too
-                await db.delete(matchActions).where(eq(matchActions.matchId, data.id));
-            }
-            await upsertLocal(matches, data);
-        }
+        // 3. Matches (cascade: removing a match removes its local actions too)
+        const matchesSnap = await getDocs(query(collection(firestoreDb, 'matches'), where('updatedAt', '>', lastSyncDate.toISOString())));
+        await applySnap(matches, matchesSnap.docs, async (tx, id) => {
+            await tx.delete(matchActions).where(eq(matchActions.matchId, id));
+        });
         onStep?.();
 
         // 4. Match Actions (using timestamp)
-        const actionsQ = query(collection(firestoreDb, 'matchActions'), where('timestamp', '>', lastSyncDate.toISOString()));
-        const actionsSnap = await getDocs(actionsQ);
-        for (const doc of actionsSnap.docs) {
-            const data = doc.data();
-            await upsertLocal(matchActions, data);
-        }
+        const actionsSnap = await getDocs(query(collection(firestoreDb, 'matchActions'), where('timestamp', '>', lastSyncDate.toISOString())));
+        await applySnap(matchActions, actionsSnap.docs);
         onStep?.();
 
         // 5. Monthly fee configs
-        const feeConfigQ = query(collection(firestoreDb, 'monthlyFeeConfig'), where('updatedAt', '>', lastSyncDate.toISOString()));
-        const feeConfigSnap = await getDocs(feeConfigQ);
-        for (const docSnap of feeConfigSnap.docs) {
-            await upsertLocal(monthlyFeeConfig, docSnap.data());
-        }
+        const feeConfigSnap = await getDocs(query(collection(firestoreDb, 'monthlyFeeConfig'), where('updatedAt', '>', lastSyncDate.toISOString())));
+        await applySnap(monthlyFeeConfig, feeConfigSnap.docs);
         onStep?.();
 
         // 6. Payments
-        const paymentsQ = query(collection(firestoreDb, 'payments'), where('updatedAt', '>', lastSyncDate.toISOString()));
-        const paymentsSnap = await getDocs(paymentsQ);
-        for (const docSnap of paymentsSnap.docs) {
-            await upsertLocal(payments, docSnap.data());
-        }
+        const paymentsSnap = await getDocs(query(collection(firestoreDb, 'payments'), where('updatedAt', '>', lastSyncDate.toISOString())));
+        await applySnap(payments, paymentsSnap.docs);
         onStep?.();
 
         // 7. Treasury events
-        const teventsQ = query(collection(firestoreDb, 'treasuryEvents'), where('updatedAt', '>', lastSyncDate.toISOString()));
-        const teventsSnap = await getDocs(teventsQ);
-        for (const docSnap of teventsSnap.docs) {
-            await upsertLocal(treasuryEvents, docSnap.data());
-        }
+        const teventsSnap = await getDocs(query(collection(firestoreDb, 'treasuryEvents'), where('updatedAt', '>', lastSyncDate.toISOString())));
+        await applySnap(treasuryEvents, teventsSnap.docs);
         onStep?.();
 
         // 8. Event payments
-        const epaymentsQ = query(collection(firestoreDb, 'eventPayments'), where('updatedAt', '>', lastSyncDate.toISOString()));
-        const epaymentsSnap = await getDocs(epaymentsQ);
-        for (const docSnap of epaymentsSnap.docs) {
-            await upsertLocal(eventPayments, docSnap.data());
-        }
+        const epaymentsSnap = await getDocs(query(collection(firestoreDb, 'eventPayments'), where('updatedAt', '>', lastSyncDate.toISOString())));
+        await applySnap(eventPayments, epaymentsSnap.docs);
         onStep?.();
 
         // Update last sync time
@@ -289,6 +273,12 @@ export const syncService = {
     syncOnAppStart: () => {
         console.log('Running initial sync on app start.');
         syncService.syncAll();
+    },
+
+    // True once the first full pull has completed. Used to show a one-time
+    // progress splash on the very first launch (the only slow sync).
+    hasSyncedBefore: async () => {
+        return (await AsyncStorage.getItem(LAST_SYNC_KEY)) !== null;
     },
 
     _debounceTimer: null as ReturnType<typeof setTimeout> | null,

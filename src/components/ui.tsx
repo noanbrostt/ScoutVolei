@@ -1,7 +1,7 @@
 // App-wide UI primitives for the "Blues" visual identity.
 // Tokens come from useFin(); see src/theme/index.ts.
-import { ReactNode, useState } from 'react';
-import { View, Text, Pressable, TextInput, ActivityIndicator, ViewStyle, KeyboardTypeOptions } from 'react-native';
+import { ReactNode, useState, forwardRef } from 'react';
+import { View, Text, Pressable, TextInput, ActivityIndicator, ViewStyle, KeyboardTypeOptions, ReturnKeyTypeOptions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useTheme } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -44,10 +44,25 @@ export const isoToBR = (iso: string | null | undefined) => {
 };
 
 // Soft card shadow (light theme only — dark uses a 1px border instead).
+// Every style key is always present (just toggled between neutral/active values)
+// so switching themes updates values in place. Returning different *shapes*
+// (border-only vs shadow-only) leaves the removed props un-reset on the native
+// view under the new architecture — that's what bugs the border radius / leaves
+// stale borders when toggling light/dark.
 export const cardShadow = (fin: FinTokens): ViewStyle =>
   fin.shadow === 'transparent'
-    ? { borderWidth: 1, borderColor: fin.line }
+    ? {
+        borderWidth: 1,
+        borderColor: fin.line,
+        shadowColor: 'transparent',
+        shadowOpacity: 0,
+        shadowRadius: 0,
+        shadowOffset: { width: 0, height: 0 },
+        elevation: 0,
+      }
     : {
+        borderWidth: 0,
+        borderColor: 'transparent',
         shadowColor: '#14213B',
         shadowOpacity: 0.08,
         shadowRadius: 12,
@@ -228,10 +243,7 @@ export function FieldLabel({ fin, children, hint }: { fin: FinTokens; children: 
 
 // ── Pill text field ──────────────────────────────────────────────────────────
 
-export function FieldPill({
-  value, onChangeText, placeholder, prefix, keyboardType, disabled, multiline, autoFocus,
-  secureTextEntry, autoCapitalize, fin, style,
-}: {
+export const FieldPill = forwardRef<TextInput, {
   value: string;
   onChangeText: (v: string) => void;
   placeholder?: string;
@@ -242,10 +254,16 @@ export function FieldPill({
   autoFocus?: boolean;
   secureTextEntry?: boolean;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  returnKeyType?: ReturnKeyTypeOptions;
+  onSubmitEditing?: () => void;
   fin: FinTokens;
   style?: ViewStyle;
-}) {
+}>(function FieldPill({
+  value, onChangeText, placeholder, prefix, keyboardType, disabled, multiline, autoFocus,
+  secureTextEntry, autoCapitalize, returnKeyType, onSubmitEditing, fin, style,
+}, ref) {
   const [focus, setFocus] = useState(false);
+  const [hidden, setHidden] = useState(true);
   return (
     <View style={[{
       flexDirection: 'row', alignItems: multiline ? 'flex-start' : 'center', gap: 8,
@@ -256,6 +274,7 @@ export function FieldPill({
     }, style]}>
       {prefix && <Text style={{ fontSize: 15, fontWeight: '700', color: fin.sub }}>{prefix}</Text>}
       <TextInput
+        ref={ref}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
@@ -264,12 +283,19 @@ export function FieldPill({
         editable={!disabled}
         multiline={multiline}
         autoFocus={autoFocus}
-        secureTextEntry={secureTextEntry}
+        secureTextEntry={secureTextEntry && hidden}
         autoCapitalize={autoCapitalize}
+        returnKeyType={returnKeyType}
+        onSubmitEditing={onSubmitEditing}
         onFocus={() => setFocus(true)}
         onBlur={() => setFocus(false)}
         style={{ flex: 1, fontSize: 15.5, fontWeight: '600', color: fin.ink, padding: 0, textAlignVertical: multiline ? 'top' : 'center' }}
       />
+      {secureTextEntry && (
+        <Pressable onPress={() => setHidden(h => !h)} hitSlop={8} style={{ padding: 2 }}>
+          <MaterialIcons name={hidden ? 'visibility-off' : 'visibility'} size={20} color={fin.sub} />
+        </Pressable>
+      )}
     </View>
   );
-}
+});

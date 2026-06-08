@@ -45,8 +45,9 @@ const AthleteRow = memo(function AthleteRow({
   onQuickPay: (item: AthleteItem) => void;
 }) {
   const p = item.currentPayment;
-  const status: 'nao_pago' | 'pago' | 'parcial' =
-    !p || !p.dataPagamento ? 'nao_pago'
+  const status: 'nao_pago' | 'pago' | 'parcial' | 'isento' =
+    p?.isento ? 'isento'
+    : !p || !p.dataPagamento ? 'nao_pago'
     : (p.valorPago != null && p.valorPago < p.valorBase) ? 'parcial' : 'pago';
   const team = item.team;
   const color = team?.color ?? fin.brand;
@@ -92,7 +93,12 @@ const AthleteRow = memo(function AthleteRow({
         </View>
       </View>
 
-      {status === 'pago' ? (
+      {status === 'isento' ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: fin.track, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20 }}>
+          <MaterialIcons name="block" size={14} color={fin.sub} />
+          <Text style={{ fontWeight: '800', fontSize: 13, color: fin.sub }}>Isento</Text>
+        </View>
+      ) : status === 'pago' ? (
         <View style={{ alignItems: 'center', gap: 4 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: fin.goodSoft, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20 }}>
             <MaterialIcons name="check" size={15} color={fin.good} />
@@ -275,8 +281,9 @@ export default function TreasuryIndex() {
   const adjustPayDate = useCallback((delta: number) =>
     setPayDate(d => { const n = new Date(d); n.setDate(n.getDate() + delta); return n; }), []);
 
-  const getPaymentStatus = (item: AthleteItem): 'nao_pago' | 'pago' | 'parcial' => {
+  const getPaymentStatus = (item: AthleteItem): 'nao_pago' | 'pago' | 'parcial' | 'isento' => {
     const p = item.currentPayment;
+    if (p?.isento) return 'isento';
     if (!p || !p.dataPagamento) return 'nao_pago';
     if (p.valorPago !== null && p.valorPago !== undefined && p.valorPago < p.valorBase) return 'parcial';
     return 'pago';
@@ -373,6 +380,29 @@ export default function TreasuryIndex() {
     }
   };
 
+  const handleToggleIsento = async () => {
+    if (!modalItem) return;
+    const baseAmount = modalItem.currentPayment?.valorBase ?? feeConfigs.get(modalItem.atleta.teamId)?.valorBase ?? 0;
+    const currentlyIsento = !!modalItem.currentPayment?.isento;
+    setModalSaving(true);
+    try {
+      await treasuryService.setIsento({
+        id: modalItem.currentPayment?.id,
+        atletaId: modalItem.atleta.id,
+        teamId: modalItem.atleta.teamId,
+        mesReferencia,
+        isento: !currentlyIsento,
+        valorBase: baseAmount,
+      });
+      syncService.triggerSync();
+      setLastUpdatedAtletaId(modalItem.atleta.id);
+      setModalVisible(false);
+      loadAthletes(selectedTeamIds);
+    } finally {
+      setModalSaving(false);
+    }
+  };
+
   const handleModalEventPay = async (parcelaId: string) => {
     const ep = modalEventParcelas.find(e => e.id === parcelaId);
     if (!ep) return;
@@ -424,19 +454,20 @@ export default function TreasuryIndex() {
   // ── Summary (hero) ──────────────────────────────────────────────────────────
 
   const summary = useMemo(() => {
-    let previsto = 0, arrecadado = 0, pagaram = 0;
+    let previsto = 0, arrecadado = 0, pagaram = 0, total = 0;
     for (const a of athletes) {
+      const st = getPaymentStatus(a);
+      if (st === 'isento') continue; // isento sai de todas as contas
+      total += 1;
       const base = a.currentPayment?.valorBase ?? feeConfigs.get(a.atleta.teamId)?.valorBase ?? 0;
       previsto += base;
-      const st = getPaymentStatus(a);
       if (st !== 'nao_pago') {
         arrecadado += a.currentPayment?.valorPago ?? 0;
         pagaram += 1;
       }
     }
     return {
-      previsto, arrecadado, pagaram,
-      total: athletes.length,
+      previsto, arrecadado, pagaram, total,
       pct: previsto > 0 ? Math.round((arrecadado / previsto) * 100) : 0,
       aReceber: Math.max(0, previsto - arrecadado),
     };
@@ -512,14 +543,17 @@ export default function TreasuryIndex() {
     );
   };
 
-  // ── Visible list (hidePaid filter keeps the just-updated athlete) ───────────
+  // ── Visible list (isentos nunca aparecem; hidePaid esconde os pagos, mantendo o recém-atualizado) ───
 
-  const visibleAthletes = useMemo(() => (
-    hidePaid
-      ? athletes.filter(a => getPaymentStatus(a) !== 'pago' || a.atleta.id === lastUpdatedAtletaId)
-      : athletes
-  ), [athletes, hidePaid, lastUpdatedAtletaId]);
-  const hiddenCount = athletes.length - visibleAthletes.length;
+  const visibleAthletes = useMemo(() => {
+    const base = athletes.filter(a => getPaymentStatus(a) !== 'isento');
+    return hidePaid
+      ? base.filter(a => getPaymentStatus(a) !== 'pago' || a.atleta.id === lastUpdatedAtletaId)
+      : base;
+  }, [athletes, hidePaid, lastUpdatedAtletaId]);
+  const hiddenCount = hidePaid
+    ? athletes.filter(a => getPaymentStatus(a) === 'pago' && a.atleta.id !== lastUpdatedAtletaId).length
+    : 0;
 
   // Hero header — memoized so tapping a card / opening the modal never re-renders the ring.
   const mensalidadesHeader = useMemo(() => (
@@ -556,7 +590,7 @@ export default function TreasuryIndex() {
           <Text style={{ fontWeight: '800', fontSize: 14, color: fin.ink }}>{monthLabel}</Text>
           <Pressable onPress={() => adjustMonth(1)} hitSlop={8}><MaterialIcons name="chevron-right" size={20} color={fin.sub} /></Pressable>
         </Pressable>
-        {isTesoureiro && <DateStepper date={payDate} onStep={adjustPayDate} fin={fin} />}
+        {isTesoureiro && <DateStepper date={payDate} onStep={adjustPayDate} onSet={setPayDate} fin={fin} />}
       </View>
     </>
   ), [fin, summary, monthLabel, monthDate, payDate, isTesoureiro, adjustMonth, adjustPayDate]);
@@ -591,6 +625,8 @@ export default function TreasuryIndex() {
             {isTesoureiro && (
               <>
                 <Divider />
+                <Menu.Item leadingIcon="block-helper" title="Isenções"
+                  onPress={() => { setMenuVisible(false); router.push('/(app)/treasury/exemptions'); }} />
                 <Menu.Item leadingIcon="cash" title="Valor da mensalidade"
                   onPress={() => { setMenuVisible(false); router.push('/(app)/treasury/fee-config'); }} />
               </>
@@ -616,7 +652,7 @@ export default function TreasuryIndex() {
           <View style={{ paddingHorizontal: 18, paddingBottom: 8 }}>
             <Pressable
               onPress={() => setHidePaid(false)}
-              style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: fin.brandSoft, borderRadius: 20, paddingVertical: 5, paddingHorizontal: 12 }}
+              style={{ alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: fin.brandSoft, borderRadius: 20, paddingVertical: 5, paddingHorizontal: 12 }}
             >
               <MaterialIcons name="visibility-off" size={14} color={fin.brand} />
               <Text style={{ fontSize: 12.5, fontWeight: '700', color: fin.brand }}>
@@ -631,6 +667,7 @@ export default function TreasuryIndex() {
       {tab === 'mensalidades' ? (
         <FlatList
           data={visibleAthletes}
+          extraData={fin}
           keyExtractor={item => item.atleta.id}
           renderItem={renderAthlete}
           contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 16 }}
@@ -648,6 +685,7 @@ export default function TreasuryIndex() {
         <>
           <FlatList
             data={events}
+            extraData={fin}
             keyExtractor={item => item.id}
             renderItem={renderEvent}
             contentContainerStyle={{ paddingHorizontal: 14, paddingBottom: 90 }}
@@ -765,6 +803,7 @@ export default function TreasuryIndex() {
                     date={modalDate}
                     fin={fin}
                     onStep={(d) => setModalDate(prev => { const n = new Date(prev); n.setDate(n.getDate() + d); return n; })}
+                    onSet={setModalDate}
                   />
                 </View>
 
@@ -833,7 +872,17 @@ export default function TreasuryIndex() {
                   </Pressable>
                 </View>
 
-                {modalItem.currentPayment && (
+                <Pressable
+                  onPress={handleToggleIsento}
+                  disabled={modalSaving}
+                  style={{ alignItems: 'center', paddingVertical: 13, marginTop: 10, borderRadius: 14, borderWidth: 1.5, borderColor: fin.line, opacity: modalSaving ? 0.6 : 1 }}
+                >
+                  <Text style={{ color: fin.sub, fontWeight: '700', fontSize: 14.5 }}>
+                    {modalItem.currentPayment?.isento ? 'Remover isenção' : 'Isentar do mês'}
+                  </Text>
+                </Pressable>
+
+                {modalItem.currentPayment && !modalItem.currentPayment.isento && (
                   <Pressable
                     onPress={() => {
                       Alert.alert('Remover registro', 'Remover este pagamento?', [

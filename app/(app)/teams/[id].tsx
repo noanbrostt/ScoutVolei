@@ -135,6 +135,7 @@ export default function TeamDetails() {
 
         <FlatList
           data={filteredPlayers}
+          extraData={fin}
           keyExtractor={item => item.id}
           contentContainerStyle={{ paddingBottom: 100 }}
           renderItem={({ item }) => (

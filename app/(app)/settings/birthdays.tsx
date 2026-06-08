@@ -58,6 +58,7 @@ export default function BirthdaysScreen() {
         <FlatList
           ref={monthsListRef}
           data={MONTHS}
+          extraData={`${selectedMonth}|${fin.bg}`}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 10, gap: 8 }}
@@ -84,6 +85,7 @@ export default function BirthdaysScreen() {
 
       <FlatList
         data={birthdays}
+        extraData={fin}
         keyExtractor={item => item.player.id}
         contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 4, paddingBottom: 40 }}
         ListEmptyComponent={!loading ? (

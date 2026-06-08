@@ -8,6 +8,7 @@ export default function TreasuryLayout() {
       <Stack.Screen name="events/[id]" />
       <Stack.Screen name="fee-config" />
       <Stack.Screen name="salary-report" />
+      <Stack.Screen name="exemptions" />
     </Stack>
   );
 }
