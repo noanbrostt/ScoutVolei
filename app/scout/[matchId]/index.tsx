@@ -1,29 +1,79 @@
-import { View, StatusBar, Platform, ScrollView, FlatList, Alert, Dimensions } from 'react-native';
-import { Text, Button, IconButton, useTheme, Portal, Dialog, RadioButton, Surface, TouchableRipple, TextInput, Checkbox } from 'react-native-paper';
+import { View, StatusBar, Platform, ScrollView, FlatList, Alert, Dimensions, Modal, Pressable, Animated } from 'react-native';
+import { Text, IconButton, useTheme, TouchableRipple } from 'react-native-paper';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { matchService } from '../../../src/services/matchService';
 import { playerService } from '../../../src/services/playerService';
 import { syncService } from '../../../src/services/syncService';
 import * as NavigationBar from 'expo-navigation-bar';
+import { useFin } from '../../../src/theme';
+import { positionAbbr, positionColor, BADGE_INACTIVE } from '../../../src/constants/positions';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { FieldPill, FieldLabel } from '../../../src/components/ui';
 
-// Actions Config
+// Actions Config — label = abreviação exibida; key = tipo gravado no banco.
 const ACTIONS = [
-    { label: 'SAQUE', key: 'Saque' },
-    { label: 'PASSE', key: 'Passe' },
+    { label: 'SAQ', key: 'Saque' },
+    { label: 'PAS', key: 'Passe' },
     { label: 'ATQ', key: 'Ataque' },
     { label: 'LEV', key: 'Levantamento' },
     { label: 'DEF', key: 'Defesa' },
-    { label: 'BLOQ', key: 'Bloqueio' },
+    { label: 'BLQ', key: 'Bloqueio' },
 ];
 
+// Rampa de qualidade 0–3 (padrão internacional de scout, harmonizada via oklch).
 const QUALITIES = [
-    { val: 0, color: '#D32F2F', label: '0' }, // Red
-    { val: 1, color: '#F57C00', label: '1' }, // Orange
-    { val: 2, color: '#FBC02D', label: '2' }, // Yellow
-    { val: 3, color: '#388E3C', label: '3' }, // Green
+    { val: 0, color: '#DE3D43', ink: '#FFFFFF' }, // Erro
+    { val: 1, color: '#E8772A', ink: '#FFFFFF' }, // Ruim
+    { val: 2, color: '#E3B92C', ink: '#4A3A00' }, // Bom
+    { val: 3, color: '#2BAE66', ink: '#FFFFFF' }, // Ponto
 ];
+
+// rgba(hex, alpha)
+const alpha = (hex: string, a: number) => {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+};
+
+// Duração do long-press (ms) para entrar no modo de edição.
+const LONGPRESS_MS = 550;
+
+// Regra de pontuação compartilhada (mesma do registro de ações).
+const computeScoreChange = (actionType: string, quality: number) =>
+    (quality === 3 && ['Ataque', 'Bloqueio', 'Saque'].includes(actionType)) ? 1 : (quality === 0 ? -1 : 0);
+
+// ── Substituição: cabeçalho de coluna + linha de jogador ──────────────────────
+function SubColHeader({ label, count, color, fin }: any) {
+    return (
+        <View style={{ height: 28, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: fin.line }}>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: fin.sub, letterSpacing: 1 }}>{label.toUpperCase()}</Text>
+            {count > 0 && (
+                <Text style={{ marginLeft: 8, fontSize: 10, fontWeight: '800', color }}>
+                    {count} selecionado{count > 1 ? 's' : ''}
+                </Text>
+            )}
+        </View>
+    );
+}
+
+function SubPlayerRow({ p, selected, onPress, fin, dark }: any) {
+    const posColor = positionColor(p.position);
+    const badgeBg = selected ? posColor : (dark ? BADGE_INACTIVE.dark : BADGE_INACTIVE.light);
+    const badgeFg = selected ? '#fff' : fin.sub;
+    const rowBg = selected ? alpha(fin.brand, dark ? 0.07 : 0.05) : 'transparent';
+    return (
+        <Pressable onPress={onPress} style={{ height: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 8, backgroundColor: rowBg }}>
+            <View style={{ width: 30, height: 22, borderRadius: 6, backgroundColor: badgeBg, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ fontSize: 8.5, fontWeight: '800', color: badgeFg, letterSpacing: 0.4 }}>{positionAbbr(p.position)}</Text>
+            </View>
+            <Text numberOfLines={1} style={{ flex: 1, fontSize: 15.5, fontWeight: '800', color: selected ? fin.brand : fin.ink, letterSpacing: 0.2 }}>
+                {(p.surname || p.name || '').toUpperCase()}
+            </Text>
+            {selected && <MaterialCommunityIcons name="check" size={17} color={fin.brand} />}
+        </Pressable>
+    );
+}
 
 const POSITION_ORDER: Record<string, number> = {
     'Ponteiro': 1,
@@ -37,6 +87,13 @@ export default function ScoutScreen() {
   const { matchId, initialLineup } = useLocalSearchParams();
   const router = useRouter();
   const theme = useTheme();
+  const fin = useFin();
+  const dark = theme.dark;
+  // Mini-cards do histórico — superfície "raised" (um degrau acima de surface).
+  const raised = dark ? '#202637' : '#F4F7FC';
+  const scoutShadow = dark
+    ? null
+    : { shadowColor: '#14213B', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 3 }, elevation: 2 };
 
   const [match, setMatch] = useState<any>(null);
   const [allPlayers, setAllPlayers] = useState<any[]>([]);
@@ -53,6 +110,7 @@ export default function ScoutScreen() {
   const [subModalVisible, setSubModalVisible] = useState(false);
   const [subOutIds, setSubOutIds] = useState<string[]>([]);
   const [subInIds, setSubInIds] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<'pos' | 'name'>('pos');
 
   // Finish Set / Match State
   const [finishSetDialogVisible, setFinishSetDialogVisible] = useState(false);
@@ -61,6 +119,21 @@ export default function ScoutScreen() {
   const [editMatchDialogVisible, setEditMatchDialogVisible] = useState(false);
   const [editOpponent, setEditOpponent] = useState('');
   const [editLocation, setEditLocation] = useState('');
+
+  // Action menu (tap no histórico ou ↩): { Cancelar · Editar · Excluir }
+  const [menuAction, setMenuAction] = useState<any | null>(null);
+
+  // Edit mode state
+  const [editingAction, setEditingAction] = useState<any | null>(null);
+  const [editPlayerId, setEditPlayerId] = useState<string | null>(null);
+  const [editActionType, setEditActionType] = useState<string>('');
+  const [editQuality, setEditQuality] = useState<number>(0);
+
+  // Long-press progress indicator
+  const [pressingActive, setPressingActive] = useState(false);
+  const pressProgress = useRef(new Animated.Value(0)).current;
+  const pressAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  const longPressFiredRef = useRef(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -164,18 +237,94 @@ export default function ScoutScreen() {
       refreshMatch();
   };
 
-  const handleUndo = async () => {
+  const handleUndo = () => {
     if (recentActions.length === 0) return;
-    const lastAction = recentActions[0];
-    
-    Alert.alert('Desfazer Ação', 'Deseja excluir esta ação e reverter a pontuação?', [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Excluir', style: 'destructive', onPress: async () => {
-            await matchService.deleteAction(lastAction.id);
-            refreshMatch();
-            syncService.triggerSync();
-        }}
-    ]);
+    setMenuAction(recentActions[0]);
+  };
+
+  const confirmDelete = async () => {
+    if (!menuAction) return;
+    await matchService.deleteAction(menuAction.id);
+    setMenuAction(null);
+    refreshMatch();
+    syncService.triggerSync();
+  };
+
+  // --- Edit mode ---
+  const enterEditMode = (action: any) => {
+    if (!action?.playerId) return; // ações genéricas (sem jogador) não são editáveis
+    setMenuAction(null);
+    setSelectedPlayerId(null);
+    setPendingAction(null);
+    setEditingAction(action);
+    setEditPlayerId(action.playerId);
+    setEditActionType(action.actionType);
+    setEditQuality(action.quality);
+  };
+
+  const exitEditMode = () => {
+    setEditingAction(null);
+    setEditPlayerId(null);
+    setEditActionType('');
+    setEditQuality(0);
+  };
+
+  const editChanged = !!editingAction && (
+    editPlayerId !== editingAction.playerId ||
+    editActionType !== editingAction.actionType ||
+    editQuality !== editingAction.quality
+  );
+
+  const saveEdit = async () => {
+    if (!editingAction || !editChanged || !editPlayerId) return;
+    await matchService.editAction(editingAction.id, {
+        playerId: editPlayerId,
+        actionType: editActionType,
+        quality: editQuality,
+        scoreChange: computeScoreChange(editActionType, editQuality),
+    });
+    exitEditMode();
+    refreshMatch();
+    syncService.triggerSync();
+  };
+
+  const deleteEditing = async () => {
+    if (!editingAction) return;
+    await matchService.deleteAction(editingAction.id);
+    exitEditMode();
+    refreshMatch();
+    syncService.triggerSync();
+  };
+
+  // --- Long-press → edit mode (com barra de progresso sobre o topbar) ---
+  const startPressTimer = (action: any) => {
+    if (!action?.playerId) return; // só ações com jogador entram em edição
+    longPressFiredRef.current = false;
+    setPressingActive(true);
+    pressProgress.setValue(0);
+    pressAnimRef.current = Animated.timing(pressProgress, {
+        toValue: 1,
+        duration: LONGPRESS_MS,
+        useNativeDriver: false,
+    });
+    pressAnimRef.current.start(({ finished }) => {
+        if (finished) {
+            longPressFiredRef.current = true;
+            setPressingActive(false);
+            enterEditMode(action);
+        }
+    });
+  };
+
+  const cancelPressTimer = () => {
+    if (pressAnimRef.current) { pressAnimRef.current.stop(); pressAnimRef.current = null; }
+    pressProgress.setValue(0);
+    setPressingActive(false);
+  };
+
+  const handleHistoryTap = (action: any) => {
+    if (longPressFiredRef.current) { longPressFiredRef.current = false; return; }
+    setMenuAction(action);
   };
 
   const sortActivePlayers = (players: any[]) => {
@@ -196,21 +345,6 @@ export default function ScoutScreen() {
           setMatch(updatedMatch);
           loadActions(match.id);
       }
-  };
-
-  const handleDeleteAction = (actionId: string) => {
-      Alert.alert('Desfazer Ação', 'Deseja excluir esta ação e reverter a pontuação?', [
-          { text: 'Cancelar', style: 'cancel' },
-          { text: 'Excluir', style: 'destructive', onPress: async () => {
-              await matchService.deleteAction(actionId);
-              refreshMatch();
-              syncService.triggerSync();
-          }}
-      ]);
-  };
-
-  const handleActionLogPress = (action: any) => {
-      handleDeleteAction(action.id);
   };
 
   // --- Core Logic: Register Action ---
@@ -243,6 +377,11 @@ export default function ScoutScreen() {
   // --- Interactions ---
 
   const handlePlayerClick = (playerId: string) => {
+      // No modo de edição, o clique apenas troca o jogador da ação editada.
+      if (editingAction) {
+          setEditPlayerId(playerId);
+          return;
+      }
       if (pendingAction) {
           // We have an action waiting, register immediately
           registerAction(playerId, pendingAction.type, pendingAction.quality);
@@ -253,6 +392,12 @@ export default function ScoutScreen() {
   };
 
   const handleActionClick = (type: string, quality: number) => {
+      // No modo de edição, o clique apenas troca a ação/qualidade editada.
+      if (editingAction) {
+          setEditActionType(type);
+          setEditQuality(quality);
+          return;
+      }
       if (selectedPlayerId) {
           // We have a player waiting, register immediately
           registerAction(selectedPlayerId, type, quality);
@@ -319,6 +464,16 @@ export default function ScoutScreen() {
     setSubInIds([]);
   };
 
+  const sortPlayers = (arr: any[]) =>
+    [...arr].sort((a, b) => {
+        const na = a.surname || a.name || '';
+        const nb = b.surname || b.name || '';
+        if (sortBy === 'name') return na.localeCompare(nb);
+        const pa = POSITION_ORDER[a.position] || 99;
+        const pb = POSITION_ORDER[b.position] || 99;
+        return pa - pb || na.localeCompare(nb);
+    });
+
   const getReservePlayers = () => {
     const activeIds = activePlayers.map(p => p.id);
     return allPlayers
@@ -331,203 +486,219 @@ export default function ScoutScreen() {
   };
 
 
-  if (!match) return <View className="flex-1 bg-black justify-center items-center"><Text className="text-white">Carregando...</Text></View>;
+  if (!match) return <View style={{ flex: 1, backgroundColor: fin.bg, justifyContent: 'center', alignItems: 'center' }}><Text style={{ color: fin.ink }}>Carregando...</Text></View>;
+
+  // Sets ganhos: contados a partir dos sets já encerrados (anteriores ao atual).
+  let setsUs = 0, setsThem = 0;
+  for (let s = 1; s < currentSet; s++) {
+      const us = recentActions.filter(a => a.setNumber === s && a.scoreChange > 0).length;
+      const them = recentActions.filter(a => a.setNumber === s && a.scoreChange < 0).length;
+      if (us > them) setsUs++; else if (them > us) setsThem++;
+  }
+  const setsLabel = `${setsUs}–${setsThem}`;
+
+  // Em edição: o histórico mostra só a ação editada, refletindo as escolhas em tempo real.
+  const historyData = editingAction
+    ? [{ ...editingAction, playerId: editPlayerId, actionType: editActionType, quality: editQuality, scoreChange: computeScoreChange(editActionType, editQuality) }]
+    : recentActions.filter(a => a.setNumber === currentSet);
+
+  const menuPlayer = menuAction ? allPlayers.find(p => p.id === menuAction.playerId) : null;
 
   return (
-    <View className="flex-1 bg-gray-900">
+    <View style={{ flex: 1, backgroundColor: fin.bg }}>
         <StatusBar hidden />
-        
-        {/* TOP BAR */}
-        <View className="h-14 flex-row items-center px-4 justify-between bg-gray-800 border-b border-gray-700">
-            {/* Left Group */}
-            <View className="flex-row items-center gap-2">
-                <Button 
-                    mode="outlined" 
-                    compact 
-                    icon="swap-horizontal" 
-                    onPress={() => setSubModalVisible(true)}
-                    contentStyle={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}
-                    labelStyle={{ fontSize: 12, lineHeight: 12 }}
-                    textColor="#E0E0E0"
-                    style={{ borderColor: "#666", paddingLeft: 2, paddingRight: 4 }}
-                >
-                    Substituir
-                </Button>
-                <Button
-                    mode="outlined"
-                    compact
-                    icon="flag-checkered"
-                    onPress={() => setFinishSetDialogVisible(true)}
-                    textColor="#E0E0E0"
-                    labelStyle={{ fontSize: 12, lineHeight: 12 }}
-                    style={{ borderColor: "#666", paddingLeft: 2, paddingRight: 4 }}
-                >
-                    Fim Set
-                </Button>
-            </View>
-            
-            {/* Score and Generic Points (Center) */}
-            <View className="flex-row items-center gap-2 -ml-24">
-                <Button 
-                    mode="contained" 
-                    compact
-                    buttonColor="#1B5E20" 
-                    onPress={() => handleGenericPoint('our')}
-                    labelStyle={{ lineHeight: 12, fontSize: 12, marginHorizontal: 8 }} 
-                    textColor="#FFF" 
-                >
-                    +1 NÓS
-                </Button>
-                <View className="items-center">
-                    <Text variant="titleMedium" style={{ color: theme.colors.primary, fontWeight: 'bold' }}>
-                        {currentSetScoreUs} x {currentSetScoreThem}
-                    </Text>
-                    <Text style={{ color: '#AAA', fontSize: 10, fontWeight: 'bold' }}>
-                        SET {currentSet}
-                    </Text>
-                </View>
-                <Button 
-                    mode="contained" 
-                    compact
-                    buttonColor="#B71C1C" 
-                    onPress={() => handleGenericPoint('opponent')}
-                    labelStyle={{ lineHeight: 12, fontSize: 12, marginHorizontal: 8 }} 
-                    textColor="#FFF" 
-                >
-                    +1 DELES
-                </Button>
-            </View>
-            
-            {/* Edit / Close Button (Right) */}
-             <View className="flex-row items-center">
-                <IconButton 
-                    icon="undo" 
-                    size={20} 
-                    iconColor="#E0E0E0" 
-                    onPress={handleUndo} 
-                    style={{ margin: 0, marginRight: 4 }}
-                    disabled={recentActions.length === 0}
-                />
-                <IconButton 
-                    icon="dots-vertical" 
-                    size={20} 
-                    iconColor="#E0E0E0" 
-                    onPress={() => setEditMatchDialogVisible(true)} 
-                    style={{ margin: 0 }}
-                />
-                <IconButton icon="close" size={20} iconColor="#E0E0E0" onPress={() => router.replace('/(app)/history')} />
-            </View>
+
+        {/* EDIT TOP BAR (overlay no modo de edição) */}
+        {editingAction ? (
+        <View style={{ height: 42, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, backgroundColor: fin.surface, borderBottomWidth: 1, borderBottomColor: fin.line }}>
+            <MaterialCommunityIcons name="pencil" size={15} color={fin.brand} />
+            <Text style={{ flex: 1, fontSize: 14, fontWeight: '800', color: fin.ink }}>Editando ação</Text>
+            <Pressable onPress={exitEditMode} style={{ paddingVertical: 6, paddingHorizontal: 10 }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: fin.sub }}>Cancelar</Text>
+            </Pressable>
+            <Pressable onPress={saveEdit} disabled={!editChanged} style={{ backgroundColor: editChanged ? fin.brand : (dark ? '#1E2433' : '#C8D5EC'), borderRadius: 10, paddingVertical: 6, paddingHorizontal: 14 }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#fff' }}>Salvar</Text>
+            </Pressable>
+            <Pressable onPress={deleteEditing} style={{ backgroundColor: '#DE3D43', borderRadius: 10, paddingVertical: 6, paddingHorizontal: 14 }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#fff' }}>Excluir</Text>
+            </Pressable>
         </View>
+        ) : (
+        /* TOP BAR */
+        <View style={{ height: 42, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, position: 'relative' }}>
+            {/* Left controls */}
+            <TouchableRipple
+                onPress={() => setSubModalVisible(true)}
+                style={{ backgroundColor: fin.surface, borderRadius: 16, paddingVertical: 5, paddingHorizontal: 10, ...(scoutShadow || {}) }}
+                borderless
+            >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <MaterialCommunityIcons name="swap-horizontal" size={13} color={fin.sub} />
+                    <Text style={{ color: fin.sub, fontWeight: '800', fontSize: 10.5 }}>Substituir</Text>
+                </View>
+            </TouchableRipple>
+            <TouchableRipple
+                onPress={() => setFinishSetDialogVisible(true)}
+                style={{ backgroundColor: fin.brandSoft, borderRadius: 16, paddingVertical: 5, paddingHorizontal: 10 }}
+                borderless
+            >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <MaterialCommunityIcons name="flag" size={13} color={fin.brand} />
+                    <Text style={{ color: fin.brand, fontWeight: '800', fontSize: 10.5 }}>Fim set</Text>
+                </View>
+            </TouchableRipple>
+
+            {/* Center scoreboard — true screen center (absolute) */}
+            <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }} pointerEvents="box-none">
+                <TouchableRipple
+                    onPress={() => handleGenericPoint('our')}
+                    style={{ backgroundColor: fin.surface, borderRadius: 14, paddingVertical: 4, paddingHorizontal: 8, ...(scoutShadow || {}) }}
+                    borderless
+                >
+                    <Text style={{ color: fin.brand, fontWeight: '800', fontSize: 10 }}>+1 NÓS</Text>
+                </TouchableRipple>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: fin.surface, borderRadius: 12, paddingVertical: 3, paddingHorizontal: 11, ...(scoutShadow || {}) }}>
+                    <Text style={{ color: fin.brand, fontWeight: '800', fontSize: 21, fontVariant: ['tabular-nums'] }}>{currentSetScoreUs}</Text>
+                    <View style={{ alignItems: 'center' }}>
+                        <Text style={{ color: fin.sub, fontWeight: '800', fontSize: 8, letterSpacing: 0.6 }}>SET {currentSet}</Text>
+                        <Text style={{ color: fin.sub, fontWeight: '700', fontSize: 9.5, marginTop: 1, fontVariant: ['tabular-nums'] }}>{setsLabel}</Text>
+                    </View>
+                    <Text style={{ color: fin.ink, fontWeight: '800', fontSize: 21, fontVariant: ['tabular-nums'] }}>{currentSetScoreThem}</Text>
+                </View>
+                <TouchableRipple
+                    onPress={() => handleGenericPoint('opponent')}
+                    style={{ backgroundColor: fin.surface, borderRadius: 14, paddingVertical: 4, paddingHorizontal: 8, ...(scoutShadow || {}) }}
+                    borderless
+                >
+                    <Text style={{ color: fin.sub, fontWeight: '800', fontSize: 10 }}>+1 DELES</Text>
+                </TouchableRipple>
+            </View>
+
+            {/* Right controls — × na extrema direita */}
+            <View style={{ flex: 1 }} />
+            <IconButton icon="undo-variant" size={18} iconColor={fin.sub} onPress={handleUndo} disabled={recentActions.length === 0} style={{ margin: 0 }} />
+            <IconButton icon="pencil" size={16} iconColor={fin.sub} onPress={() => setEditMatchDialogVisible(true)} style={{ margin: 0 }} />
+            <IconButton icon="close" size={18} iconColor={fin.sub} onPress={() => router.replace('/(app)/history')} style={{ margin: 0 }} />
+        </View>
+        )}
+
+        {/* Long-press progress bar (sobre o topbar) */}
+        {pressingActive && (
+            <Animated.View
+                pointerEvents="none"
+                style={{ position: 'absolute', top: 0, left: 0, height: 3, backgroundColor: fin.brand, zIndex: 50, width: pressProgress.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }}
+            />
+        )}
 
         {/* MAIN CONTENT */}
-        <View className="flex-1 flex-row">
-            
-            {/* LEFT: PLAYERS (25%) */}
-            <View className="w-[25%] flex-col p-2 border-r border-gray-700">
-                <View className="flex-1 gap-2">
-                    {activePlayers.map(p => (
+        <View style={{ flex: 1, flexDirection: 'row', minHeight: 0 }}>
+
+            {/* LEFT: PLAYERS */}
+            <View style={{ width: 224, flexDirection: 'column', gap: 4, paddingLeft: 8, paddingBottom: 6 }}>
+                {activePlayers.map(p => {
+                    const sel = editingAction ? editPlayerId === p.id : selectedPlayerId === p.id;
+                    const abbr = positionAbbr(p.position);
+                    return (
                         <TouchableRipple
                             key={p.id}
                             onPress={() => handlePlayerClick(p.id)}
-                            style={{ 
-                                flex: 1, 
-                                backgroundColor: selectedPlayerId === p.id ? theme.colors.primary : '#2A2A2A',
-                                borderRadius: 8,
+                            style={{
+                                flex: 1,
+                                borderRadius: 11,
+                                paddingHorizontal: 9,
+                                borderWidth: 2,
+                                borderColor: sel ? fin.brand : 'transparent',
+                                backgroundColor: sel ? fin.brandSoft : fin.surface,
                                 justifyContent: 'center',
-                                paddingHorizontal: 12,
-                                borderWidth: selectedPlayerId === p.id ? 2 : 0,
-                                borderColor: '#FFF'
+                                ...(scoutShadow || {}),
                             }}
+                            borderless
                         >
-                            <Text 
-                                variant="titleMedium" 
-                                numberOfLines={1}
-                                style={{ 
-                                    color: selectedPlayerId === p.id ? '#FFF' : '#E0E0E0', 
-                                    fontWeight: 'bold',
-                                    textAlign: 'left',
-                                    fontSize: 16 
-                                }}
-                            >
-                                {(p.surname || p.name || "").toUpperCase()}
-                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <View style={{ width: 30, height: 22, borderRadius: 6, backgroundColor: positionColor(p.position), alignItems: 'center', justifyContent: 'center' }}>
+                                    <Text style={{ color: '#fff', fontSize: 8.5, fontWeight: '800', letterSpacing: 0.4 }}>{abbr}</Text>
+                                </View>
+                                <Text
+                                    numberOfLines={1}
+                                    style={{ flex: 1, fontWeight: '800', fontSize: 17, letterSpacing: 0.2, color: sel ? fin.brand : fin.ink }}
+                                >
+                                    {(p.surname || p.name || '').toUpperCase()}
+                                </Text>
+                            </View>
                         </TouchableRipple>
-                    ))}
+                    );
+                })}
+            </View>
+
+            {/* MIDDLE: LOG */}
+            <View style={{ width: 168, paddingLeft: 6, paddingBottom: 6 }}>
+                <View style={{ flex: 1, backgroundColor: fin.surface, borderRadius: 11, padding: 6, ...(scoutShadow || {}) }}>
+                    <Text style={{ color: fin.sub, fontSize: 8.5, fontWeight: '800', letterSpacing: 1, textAlign: 'center', paddingTop: 2, paddingBottom: 5 }}>HISTÓRICO</Text>
+                    <FlatList
+                        data={historyData}
+                        keyExtractor={item => item.id}
+                        showsVerticalScrollIndicator={false}
+                        extraData={`${fin.bg}-${editingAction?.id ?? ''}-${editPlayerId}-${editActionType}-${editQuality}`}
+                        renderItem={({ item }) => {
+                            const player = allPlayers.find(p => p.id === item.playerId);
+                            const isEditing = !!editingAction;
+                            let color = fin.sub;
+                            if (item.scoreChange > 0) color = '#2BAE66';
+                            if (item.scoreChange < 0) color = '#DE3D43';
+
+                            return (
+                                <TouchableRipple
+                                    onPress={isEditing ? undefined : () => handleHistoryTap(item)}
+                                    onPressIn={isEditing ? undefined : () => startPressTimer(item)}
+                                    onPressOut={isEditing ? undefined : cancelPressTimer}
+                                    style={{ marginBottom: 4, paddingVertical: 4, paddingHorizontal: 7, borderRadius: 6, backgroundColor: raised, borderLeftWidth: 3, borderLeftColor: color, borderWidth: isEditing ? 1.5 : 0, borderColor: isEditing ? fin.brand : 'transparent' }}
+                                    borderless
+                                >
+                                    <View>
+                                        <Text numberOfLines={1} style={{ color: fin.ink, fontWeight: '800', fontSize: 12 }}>
+                                            {player ? (player.surname || player.name || '').toUpperCase() : 'GERAL'}
+                                        </Text>
+                                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 1 }}>
+                                            <Text style={{ color: fin.sub, fontSize: 10, fontWeight: '600' }}>{item.actionType}</Text>
+                                            <Text style={{ color: color, fontWeight: '800', fontSize: 11 }}>{item.quality}</Text>
+                                        </View>
+                                    </View>
+                                </TouchableRipple>
+                            );
+                        }}
+                    />
                 </View>
             </View>
 
-            {/* MIDDLE: LOG (20%) */}
-            <View className="w-[20%] bg-gray-800 border-r border-gray-700">
-                <Text style={{ color: '#AAA', textAlign: 'center', padding: 4, fontSize: 10, fontWeight: 'bold' }}>HISTÓRICO</Text>
-                <FlatList
-                    data={recentActions.filter(a => a.setNumber === currentSet)}
-                    keyExtractor={item => item.id}
-                    contentContainerStyle={{ padding: 4 }}
-                    renderItem={({ item }) => {
-                        const player = allPlayers.find(p => p.id === item.playerId);
-                        let color = '#BBB'; // Default Grey
-                        if (item.scoreChange > 0) color = '#4CAF50'; // Green
-                        if (item.scoreChange < 0) color = '#F44336'; // Red
-
-                        return (
-                            <TouchableRipple 
-                                onPress={() => handleActionLogPress(item)} 
-                                style={{ 
-                                    marginBottom: 4, 
-                                    padding: 6, 
-                                    borderRadius: 4, 
-                                    backgroundColor: '#333',
-                                    borderLeftWidth: 3,
-                                    borderLeftColor: color
-                                }}
-                            >
-                                <View>
-                                    <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 12 }}>
-                                        {player ? (player.surname || player.name || "").toUpperCase() : 'GERAL'}
-                                    </Text>
-                                    <View className="flex-row justify-between">
-                                        <Text style={{ color: '#CCC', fontSize: 10 }}>{item.actionType}</Text>
-                                        <Text style={{ color: color, fontWeight: 'bold', fontSize: 10 }}>{item.quality}</Text>
-                                    </View>
-                                </View>
-                            </TouchableRipple>
-                        );
-                    }}
-                />
-            </View>
-
-            {/* RIGHT: ACTION MATRIX (Flex) */}
-            <View className="flex-1 p-1 bg-black">
+            {/* RIGHT: ACTION MATRIX */}
+            <View style={{ flex: 1, flexDirection: 'column', gap: 4, paddingLeft: 6, paddingRight: 8, paddingBottom: 6, minWidth: 0 }}>
                 {ACTIONS.map((action) => (
-                    <View key={action.key} className="flex-1 flex-row mb-1 gap-1">
-                        {/* Label Column */}
-                        <View className="w-14 justify-center items-center bg-gray-800 rounded">
-                            <Text style={{ color: '#FFF', fontWeight: 'bold', fontSize: 11 }}>{action.label}</Text>
+                    <View key={action.key} style={{ flex: 1, flexDirection: 'row', alignItems: 'stretch', gap: 4, backgroundColor: fin.surface, borderRadius: 11, padding: 4, minHeight: 0, ...(scoutShadow || {}) }}>
+                        <View style={{ width: 46, justifyContent: 'center', paddingLeft: 5 }}>
+                            <Text style={{ color: fin.ink, fontWeight: '800', fontSize: 10.5, letterSpacing: 0.4 }}>{action.label}</Text>
                         </View>
-                        
-                        {/* Quality Buttons */}
+
                         {QUALITIES.map((q) => {
-                            const isActive = pendingAction?.type === action.key && pendingAction?.quality === q.val;
+                            const isActive = editingAction
+                                ? (editActionType === action.key && editQuality === q.val)
+                                : (pendingAction?.type === action.key && pendingAction?.quality === q.val);
                             return (
                                 <TouchableRipple
                                     key={q.val}
                                     onPress={() => handleActionClick(action.key, q.val)}
-                                    style={{ 
-                                        flex: 1, 
-                                        backgroundColor: isActive ? q.color : '#1A1A1A', 
-                                        borderRadius: 4,
+                                    style={{
+                                        flex: 1,
+                                        borderRadius: 8,
                                         justifyContent: 'center',
                                         alignItems: 'center',
-                                        borderWidth: isActive ? 2 : 1,
-                                        borderColor: isActive ? '#FFF' : q.color 
+                                        backgroundColor: isActive ? q.color : alpha(q.color, dark ? 0.16 : 0.13),
+                                        borderWidth: isActive ? 3 : 0,
+                                        borderColor: isActive ? fin.brand : 'transparent',
                                     }}
+                                    borderless
                                 >
-                                    <Text style={{ 
-                                        color: isActive ? '#FFF' : q.color, 
-                                        fontSize: 18, 
-                                        fontWeight: 'bold' 
-                                    }}>
-                                        {q.label}
+                                    <Text style={{ color: isActive ? q.ink : q.color, fontSize: 14, fontWeight: '800' }}>
+                                        {q.val}
                                     </Text>
                                 </TouchableRipple>
                             );
@@ -537,130 +708,185 @@ export default function ScoutScreen() {
             </View>
         </View>
 
-        {/* FINISH SET DIALOG */}
-        <Portal>
-            <Dialog visible={finishSetDialogVisible} onDismiss={() => setFinishSetDialogVisible(false)} style={{ maxWidth: 400, alignSelf: 'center', width: '90%' }}>
-                <Dialog.Title style={{ textAlign: 'center' }}>Fim do Set {currentSet}</Dialog.Title>
-                <Dialog.Content>
-                    <Text variant="headlineMedium" style={{ textAlign: 'center', marginTop: 8, marginBottom: 0, fontWeight: 'bold' }}>
-                        {currentSetScoreUs} x {currentSetScoreThem}
-                    </Text>
-                </Dialog.Content>
-                <Dialog.Actions style={{ justifyContent: 'space-between', paddingHorizontal: 8, paddingBottom: 8 }}>
-                    <Button onPress={() => setFinishSetDialogVisible(false)}>
-                        Cancelar
-                    </Button>
-                    <View style={{ flexDirection: 'row', gap: 8 }}>
-                        <Button 
-                            mode="outlined" 
-                            onPress={handleEndMatch}
-                            textColor={theme.colors.error}
-                            style={{ borderColor: theme.colors.error }}
-                        >
-                            Fim Jogo
-                        </Button>
-                        <Button 
-                            mode="contained" 
-                            onPress={handleNextSet}
-                        >
-                            Próximo Set
-                        </Button>
+        {/* FINISH SET MODAL */}
+        <Modal
+            visible={finishSetDialogVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setFinishSetDialogVisible(false)}
+            statusBarTranslucent
+        >
+            <Pressable onPress={() => setFinishSetDialogVisible(false)} style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: dark ? 'rgba(6,8,14,0.82)' : 'rgba(180,190,210,0.72)' }}>
+                <View onStartShouldSetResponder={() => true} style={{ width: '58%', maxWidth: 440, backgroundColor: fin.surface, borderRadius: 18, overflow: 'hidden' }}>
+                    {/* Header */}
+                    <View style={{ height: 42, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: fin.line }}>
+                        <Text style={{ flex: 1, fontSize: 15, fontWeight: '800', color: fin.ink }}>Fim do Set {currentSet}</Text>
                     </View>
-                </Dialog.Actions>
-            </Dialog>
-        </Portal>
+                    {/* Body — placar do set */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, paddingVertical: 22 }}>
+                        <View style={{ alignItems: 'center' }}>
+                            <Text style={{ fontSize: 42, fontWeight: '800', color: fin.brand, fontVariant: ['tabular-nums'], lineHeight: 46 }}>{currentSetScoreUs}</Text>
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: fin.sub, letterSpacing: 1, marginTop: 2 }}>NÓS</Text>
+                        </View>
+                        <Text style={{ fontSize: 20, fontWeight: '800', color: fin.sub }}>×</Text>
+                        <View style={{ alignItems: 'center' }}>
+                            <Text style={{ fontSize: 42, fontWeight: '800', color: fin.ink, fontVariant: ['tabular-nums'], lineHeight: 46 }}>{currentSetScoreThem}</Text>
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: fin.sub, letterSpacing: 1, marginTop: 2 }}>DELES</Text>
+                        </View>
+                    </View>
+                    {/* Footer */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingBottom: 16 }}>
+                        <Pressable onPress={() => setFinishSetDialogVisible(false)} style={{ paddingVertical: 8, paddingHorizontal: 12 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: fin.sub }}>Cancelar</Text>
+                        </Pressable>
+                        <View style={{ flex: 1 }} />
+                        <Pressable onPress={handleEndMatch} style={{ borderWidth: 1.5, borderColor: '#DE3D43', borderRadius: 10, paddingVertical: 7, paddingHorizontal: 14 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '800', color: '#DE3D43' }}>Fim de jogo</Text>
+                        </Pressable>
+                        <Pressable onPress={handleNextSet} style={{ backgroundColor: fin.brand, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 16 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '800', color: '#fff' }}>Próximo set</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </Pressable>
+        </Modal>
 
         {/* SUBSTITUTION MODAL */}
-        <Portal>
-            <Dialog visible={subModalVisible} onDismiss={() => setSubModalVisible(false)} style={{ height: '95%', maxHeight: '95%' }}>
-                <Dialog.ScrollArea style={{ flex: 1, paddingHorizontal: 16, minHeight: '70%' }}>
-                    <View style={{ flex: 1, paddingVertical: 8 }}> 
-                        {/* Headers Fixed */}
-                        <View className="flex-row justify-between border-b border-gray-200 pb-2 mb-2">
-                            <View className="flex-1 mr-2">
-                                <Text variant="labelMedium" style={{fontWeight: 'bold'}}>QUEM SAI</Text>
-                            </View>
-                            <View className="flex-1 ml-2 pl-2 border-l border-transparent">
-                                <Text variant="labelMedium" style={{fontWeight: 'bold'}}>QUEM ENTRA</Text>
-                            </View>
+        <Modal
+            visible={subModalVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setSubModalVisible(false)}
+            statusBarTranslucent
+        >
+            <Pressable onPress={() => setSubModalVisible(false)} style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: dark ? 'rgba(6,8,14,0.82)' : 'rgba(180,190,210,0.72)' }}>
+                <View onStartShouldSetResponder={() => true} style={{ width: '87%', height: '90%', backgroundColor: fin.surface, borderRadius: 18, overflow: 'hidden' }}>
+                    {/* Header */}
+                    <View style={{ height: 42, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8, borderBottomWidth: 1, borderBottomColor: fin.line }}>
+                        <Text style={{ flex: 1, fontSize: 15, fontWeight: '800', color: fin.ink }}>Substituição</Text>
+                        <Pressable
+                            onPress={() => setSortBy(s => s === 'pos' ? 'name' : 'pos')}
+                            style={{ borderWidth: 1.5, borderColor: fin.line, borderRadius: 8, paddingVertical: 3, paddingHorizontal: 9 }}
+                        >
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: fin.sub }}>{sortBy === 'pos' ? 'A–Z' : 'Posição'}</Text>
+                        </Pressable>
+                        <Pressable onPress={() => setSubModalVisible(false)} style={{ paddingVertical: 4, paddingHorizontal: 8 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: fin.sub }}>Cancelar</Text>
+                        </Pressable>
+                        <Pressable
+                            onPress={confirmSubstitution}
+                            disabled={subOutIds.length === 0 && subInIds.length === 0}
+                            style={{ backgroundColor: (subOutIds.length > 0 || subInIds.length > 0) ? fin.brand : (dark ? '#1E2433' : '#C8D5EC'), borderRadius: 10, paddingVertical: 6, paddingHorizontal: 14 }}
+                        >
+                            <Text style={{ fontSize: 13, fontWeight: '800', color: '#fff' }}>Confirmar</Text>
+                        </Pressable>
+                    </View>
+
+                    {/* Two columns */}
+                    <View style={{ flex: 1, flexDirection: 'row' }}>
+                        {/* QUEM SAI */}
+                        <View style={{ flex: 1, borderRightWidth: 1, borderRightColor: fin.line }}>
+                            <SubColHeader label="Quem sai" count={subOutIds.length} color={fin.brand} fin={fin} />
+                            <FlatList
+                                data={sortPlayers(activePlayers)}
+                                keyExtractor={p => p.id}
+                                extraData={`${sortBy}-${subOutIds.join()}`}
+                                renderItem={({ item: p }) => (
+                                    <SubPlayerRow p={p} selected={subOutIds.includes(p.id)} onPress={() => toggleSubOut(p.id)} fin={fin} dark={dark} />
+                                )}
+                            />
                         </View>
-
-                        {/* Scrollable Lists Container */}
-                        <View className="flex-1 flex-row"> 
-                            {/* OUT List */}
-                            <ScrollView className="flex-1 mr-2" nestedScrollEnabled contentContainerStyle={{ paddingBottom: 16 }}>
-                                {activePlayers.map(p => {
-                                    const isSelected = subOutIds.includes(p.id);
-                                    return (
-                                        <Checkbox.Item 
-                                            key={p.id} 
-                                            label={(p.surname || p.name).toUpperCase()} 
-                                            status={isSelected ? 'checked' : 'unchecked'}
-                                            onPress={() => toggleSubOut(p.id)}
-                                            mode="android" 
-                                            style={{ paddingVertical: 0 }}
-                                            labelStyle={{ fontSize: 14, textAlign: 'left' }}
-                                            position="leading"
-                                        />
-                                    );
-                                })}
-                            </ScrollView>
-
-                            {/* Vertical Divider */}
-                            <View className="w-[1px] bg-gray-200 mx-1 h-full" />
-
-                            {/* IN List */}
-                            <ScrollView className="flex-1 ml-2" nestedScrollEnabled contentContainerStyle={{ paddingBottom: 16 }}>
-                                {getReservePlayers().map(p => {
-                                    const isSelected = subInIds.includes(p.id);
-                                    return (
-                                        <Checkbox.Item 
-                                            key={p.id} 
-                                            label={(p.surname || p.name).toUpperCase()} 
-                                            status={isSelected ? 'checked' : 'unchecked'}
-                                            onPress={() => toggleSubIn(p.id)}
-                                            mode="android" 
-                                            style={{ paddingVertical: 0 }}
-                                            labelStyle={{ fontSize: 14, textAlign: 'left' }}
-                                            position="leading"
-                                        />
-                                    );
-                                })}
-                            </ScrollView>
+                        {/* QUEM ENTRA */}
+                        <View style={{ flex: 1 }}>
+                            <SubColHeader label="Quem entra" count={subInIds.length} color={fin.good} fin={fin} />
+                            <FlatList
+                                data={sortPlayers(getReservePlayers())}
+                                keyExtractor={p => p.id}
+                                extraData={`${sortBy}-${subInIds.join()}`}
+                                renderItem={({ item: p }) => (
+                                    <SubPlayerRow p={p} selected={subInIds.includes(p.id)} onPress={() => toggleSubIn(p.id)} fin={fin} dark={dark} />
+                                )}
+                            />
                         </View>
                     </View>
-                </Dialog.ScrollArea>
-                <Dialog.Actions style={{ paddingVertical: 0, marginTop: -16 }}>
-                    <Button onPress={() => setSubModalVisible(false)}>Cancelar</Button>
-                    <Button mode="contained" onPress={confirmSubstitution} disabled={subOutIds.length === 0 && subInIds.length === 0}>Confirmar</Button>
-                </Dialog.Actions>
-            </Dialog>
-        </Portal>
+                </View>
+            </Pressable>
+        </Modal>
 
-        {/* EDIT MATCH DIALOG */}
-        <Portal>
-            <Dialog visible={editMatchDialogVisible} onDismiss={() => setEditMatchDialogVisible(false)}>
-                <Dialog.Title>Editar Partida</Dialog.Title>
-                <Dialog.Content>
-                    <TextInput
-                        label="Nome do Adversário"
-                        value={editOpponent}
-                        onChangeText={setEditOpponent}
-                        mode="outlined"
-                        style={{ marginBottom: 12 }}
-                    />
-                    <TextInput
-                        label="Local"
-                        value={editLocation}
-                        onChangeText={setEditLocation}
-                        mode="outlined"
-                    />
-                </Dialog.Content>
-                <Dialog.Actions>
-                    <Button onPress={() => setEditMatchDialogVisible(false)}>Cancelar</Button>
-                    <Button onPress={handleEditMatch}>Salvar</Button>
-                </Dialog.Actions>
-            </Dialog>
-        </Portal>
+        {/* ACTION MENU MODAL (Cancelar · Editar · Excluir) */}
+        <Modal
+            visible={menuAction !== null}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setMenuAction(null)}
+            statusBarTranslucent
+        >
+            <Pressable onPress={() => setMenuAction(null)} style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: dark ? 'rgba(6,8,14,0.82)' : 'rgba(180,190,210,0.72)' }}>
+                <View onStartShouldSetResponder={() => true} style={{ width: '60%', maxWidth: 460, backgroundColor: fin.surface, borderRadius: 18, overflow: 'hidden' }}>
+                    {/* Header */}
+                    <View style={{ height: 42, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: fin.line }}>
+                        <Text numberOfLines={1} style={{ flex: 1, fontSize: 15, fontWeight: '800', color: fin.ink }}>
+                            {menuPlayer ? (menuPlayer.surname || menuPlayer.name || '').toUpperCase() : 'AÇÃO'}
+                        </Text>
+                    </View>
+                    {/* Body */}
+                    <View style={{ paddingHorizontal: 16, paddingVertical: 18 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: fin.sub, lineHeight: 20 }}>
+                            {menuAction ? `${menuAction.actionType} · Nota ${menuAction.quality}` : ''}
+                        </Text>
+                    </View>
+                    {/* Footer */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingBottom: 16 }}>
+                        <Pressable onPress={() => setMenuAction(null)} style={{ paddingVertical: 8, paddingHorizontal: 12 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: fin.sub }}>Cancelar</Text>
+                        </Pressable>
+                        <Pressable
+                            onPress={() => enterEditMode(menuAction)}
+                            disabled={!menuAction?.playerId}
+                            style={{ backgroundColor: menuAction?.playerId ? fin.brand : (dark ? '#1E2433' : '#C8D5EC'), borderRadius: 10, paddingVertical: 8, paddingHorizontal: 16 }}
+                        >
+                            <Text style={{ fontSize: 13, fontWeight: '800', color: '#fff' }}>Editar</Text>
+                        </Pressable>
+                        <Pressable onPress={confirmDelete} style={{ backgroundColor: '#DE3D43', borderRadius: 10, paddingVertical: 8, paddingHorizontal: 16 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '800', color: '#fff' }}>Excluir</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </Pressable>
+        </Modal>
+
+        {/* EDIT MATCH MODAL */}
+        <Modal
+            visible={editMatchDialogVisible}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setEditMatchDialogVisible(false)}
+            statusBarTranslucent
+        >
+            <Pressable onPress={() => setEditMatchDialogVisible(false)} style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: dark ? 'rgba(6,8,14,0.82)' : 'rgba(180,190,210,0.72)' }}>
+                <View onStartShouldSetResponder={() => true} style={{ width: '70%', maxWidth: 560, backgroundColor: fin.surface, borderRadius: 18, overflow: 'hidden' }}>
+                    {/* Header */}
+                    <View style={{ height: 42, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: fin.line }}>
+                        <Text style={{ flex: 1, fontSize: 15, fontWeight: '800', color: fin.ink }}>Editar Partida</Text>
+                    </View>
+                    {/* Body */}
+                    <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 4 }}>
+                        <FieldLabel fin={fin}>Adversário</FieldLabel>
+                        <FieldPill value={editOpponent} onChangeText={setEditOpponent} placeholder="Nome do adversário" fin={fin} style={{ marginBottom: 14 }} />
+                        <FieldLabel fin={fin}>Local</FieldLabel>
+                        <FieldPill value={editLocation} onChangeText={setEditLocation} placeholder="Local da partida" fin={fin} />
+                    </View>
+                    {/* Footer */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 16 }}>
+                        <Pressable onPress={() => setEditMatchDialogVisible(false)} style={{ paddingVertical: 8, paddingHorizontal: 12 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: fin.sub }}>Cancelar</Text>
+                        </Pressable>
+                        <Pressable onPress={handleEditMatch} style={{ backgroundColor: fin.brand, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 16 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '800', color: '#fff' }}>Salvar</Text>
+                        </Pressable>
+                    </View>
+                </View>
+            </Pressable>
+        </Modal>
     </View>
   )};

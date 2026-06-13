@@ -2,7 +2,7 @@
   "expo": {
     "name": "Blues Voleibol",
     "slug": "scoutvolei",
-    "version": "1.0.0",
+    "version": "3.0.2",
     "orientation": "portrait",
     "icon": "./assets/icon.jpg",
     "userInterfaceStyle": "automatic",

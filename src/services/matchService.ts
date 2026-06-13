@@ -151,7 +151,24 @@ export const matchService = {
     }).where(eq(matchActions.id, actionId));
   },
 
-  addAction: async (data: { 
+  editAction: async (actionId: string, data: {
+    playerId: string | null,
+    actionType: string,
+    quality: number,
+    scoreChange: number
+  }) => {
+    // Atualiza player/ação/qualidade e o scoreChange recalculado. merge:true no sync
+    // envia a linha inteira, mantendo o Firestore consistente.
+    await db.update(matchActions).set({
+        playerId: data.playerId,
+        actionType: data.actionType,
+        quality: data.quality,
+        scoreChange: data.scoreChange,
+        syncStatus: 'pending',
+    }).where(eq(matchActions.id, actionId));
+  },
+
+  addAction: async (data: {
     matchId: string, 
     playerId: string | null, 
     setNumber: number, 

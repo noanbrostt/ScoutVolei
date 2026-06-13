@@ -9,6 +9,9 @@ import { syncService } from '../../../src/services/syncService';
 import { useState } from 'react';
 import { useFin } from '../../../src/theme';
 import { cardShadow, PillButton, CircularProgress } from '../../../src/components/ui';
+import Constants from 'expo-constants';
+
+const APP_VERSION = Constants.expoConfig?.version ?? '';
 
 export default function Profile() {
   const fin = useFin();
@@ -121,7 +124,7 @@ export default function Profile() {
           <PillButton label="Sair" icon="logout" variant="danger" fin={fin} onPress={handleLogout} />
 
           <Text style={{ textAlign: 'center', fontSize: 11.5, fontWeight: '600', color: fin.sub, opacity: 0.7, marginTop: 16 }}>
-            © Noan Caliel Brostt
+            © Noan Caliel Brostt{APP_VERSION ? `  ·  v${APP_VERSION}` : ''}
           </Text>
         </ScrollView>
       </SafeAreaView>
